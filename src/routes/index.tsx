@@ -23,7 +23,7 @@ export const Route = createFileRoute("/")({
         content:
           "Sube tu sílabo universitario en PDF o Word y Syllabot extrae exámenes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
       },
-      { property: "og:title", content: "Syllabot — Tu semestre organizado en segundos" },
+      { property: "og:title", content: "Syllabot â€” Tu semestre organizado en segundos" },
       {
         property: "og:description",
         content:
@@ -36,22 +36,22 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Phase = "idle" | "file" | "loading" | "success";
+type Phase = "idle" | "file" | "loading" | "success" | "error";
 
 function Index() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [fileName, setFileName] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [icsBlob, setIcsBlob] = useState<Blob | null>(null);
+  const [eventCount, setEventCount] = useState<number>(0);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const acceptFile = useCallback((name: string) => {
     setFileName(name);
     setPhase("file");
   }, []);
 
-  // Native change listener: React's synthetic onChange misses file-picker
-  // change events in some environments.
   useEffect(() => {
     const input = inputRef.current;
     if (!input) return;
@@ -70,37 +70,58 @@ function Index() {
     if (file) acceptFile(file.name);
   };
 
-  const generate = () => {
-    if (phase !== "file") return;
+  const generate = async () => {
+    const fileObj = inputRef.current?.files?.[0];
+    if (phase !== "file" || !fileObj) return;
+
     setPhase("loading");
-    timerRef.current = setTimeout(() => setPhase("success"), 2800);
+    setErrorMessage("");
+    setIcsBlob(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", fileObj);
+
+      const res = await fetch("http://localhost:8000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Error desconocido del servidor." }));
+        throw new Error(err.detail ?? `Error ${res.status}`);
+      }
+
+      const blob = await res.blob();
+
+      // Contar eventos en el .ics para mostrar en la UI
+      const text = await blob.text();
+      const count = (text.match(/BEGIN:VEVENT/g) ?? []).length;
+
+      setIcsBlob(blob);
+      setEventCount(count);
+      setPhase("success");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Error al conectar con el servidor.");
+      setPhase("error");
+    }
   };
 
   const reset = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
     setPhase("idle");
     setFileName("");
+    setErrorMessage("");
+    setIcsBlob(null);
+    setEventCount(0);
     if (inputRef.current) inputRef.current.value = "";
   };
 
   const downloadIcs = () => {
-    const ics = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Syllabot//ES",
-      "BEGIN:VEVENT",
-      "SUMMARY:Examen Parcial 1 (generado con Syllabot)",
-      "DTSTART;VALUE=DATE:20261005",
-      "DTEND;VALUE=DATE:20261006",
-      "DESCRIPTION:Evento de ejemplo extraído de tu sílabo.",
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n");
-    const blob = new Blob([ics], { type: "text/calendar" });
-    const url = URL.createObjectURL(blob);
+    if (!icsBlob) return;
+    const url = URL.createObjectURL(icsBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "mi_semestre.ics";
+    a.download = `${fileName.replace(".pdf", "") || "mi_semestre"}.ics`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -114,9 +135,7 @@ function Index() {
             <span className="flex size-8 items-center justify-center rounded-lg bg-primary">
               <Bot className="size-5 text-primary-foreground" />
             </span>
-            <span className="text-lg font-semibold tracking-tight text-foreground">
-              Syllabot
-            </span>
+            <span className="text-lg font-semibold tracking-tight text-foreground">Syllabot</span>
           </a>
           <button className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
             Iniciar Sesión
@@ -130,13 +149,13 @@ function Index() {
           Tu semestre organizado en segundos, no en horas.
         </h1>
         <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Sube tu sílabo y nuestra IA extraerá todas las fechas de exámenes y
-          entregas directamente a tu Google Calendar.
+          Sube tu sílabo y nuestra IA extraerá todas las fechas de exámenes y entregas directamente
+          a tu Google Calendar.
         </p>
 
         {/* Dropzone */}
         <div className="mt-12 w-full max-w-2xl">
-          {phase !== "success" ? (
+          {phase === "idle" || phase === "file" || phase === "loading" ? (
             <>
               <label
                 onDragOver={(e) => {
@@ -156,7 +175,6 @@ function Index() {
                   type="file"
                   accept=".pdf,.doc,.docx"
                   className="hidden"
-                  
                   disabled={phase === "loading"}
                 />
                 {phase === "loading" ? (
@@ -177,9 +195,7 @@ function Index() {
                       <Check className="size-7 text-success" />
                     </span>
                     <div>
-                      <p className="text-lg font-semibold text-foreground">
-                        {fileName}
-                      </p>
+                      <p className="text-lg font-semibold text-foreground">{fileName}</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Archivo cargado. Haz clic para cambiarlo.
                       </p>
@@ -229,7 +245,7 @@ function Index() {
                 )}
               </button>
             </>
-          ) : (
+          ) : phase === "success" ? (
             <div className="flex flex-col items-center gap-6 rounded-2xl border border-border bg-card px-8 py-14 shadow-sm">
               <span className="flex size-16 items-center justify-center rounded-full bg-success/10">
                 <CalendarCheck className="size-8 text-success" />
@@ -241,7 +257,7 @@ function Index() {
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   Encontramos{" "}
                   <span className="font-semibold text-foreground">
-                    12 fechas de exámenes y entregas
+                    {eventCount} {eventCount === 1 ? "evaluación" : "evaluaciones"}
                   </span>{" "}
                   en <span className="font-medium">{fileName}</span>.
                 </p>
@@ -263,6 +279,27 @@ function Index() {
                 </button>
               </div>
             </div>
+          ) : (
+            <div className="flex flex-col items-center gap-6 rounded-2xl border border-destructive/40 bg-destructive/5 px-8 py-14">
+              <span className="flex size-16 items-center justify-center rounded-full bg-destructive/10">
+                <X className="size-8 text-destructive" />
+              </span>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                  Algo salió mal
+                </h2>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+                  {errorMessage}
+                </p>
+              </div>
+              <button
+                onClick={reset}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 text-base font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                <RotateCcw className="size-4" />
+                Intentar de nuevo
+              </button>
+            </div>
           )}
         </div>
       </main>
@@ -270,7 +307,7 @@ function Index() {
       {/* Footer */}
       <footer className="border-t border-border/60 py-8">
         <p className="text-center text-sm text-muted-foreground">
-          © 2026 Syllabot — De sílabos caóticos a semestres organizados.
+          © 2026 Syllabot â€” De sílabos caóticos a semestres organizados.
         </p>
       </footer>
     </div>

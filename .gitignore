@@ -30,3 +30,38 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ─── Secrets & Environment Variables ────────────────────────────────────────
+# NUNCA subas archivos .env con claves reales
+.env
+.env.*
+!.env.example
+
+# ─── Python / Backend ────────────────────────────────────────────────────────
+# Entorno virtual
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Distribución / build de Python
+backend/dist/
+backend/build/
+backend/*.egg-info/
+
+# mypy / pyright cache
+.mypy_cache/
+.pyright/
+
+# pytest
+.pytest_cache/
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+Thumbs.db
+Desktop.ini

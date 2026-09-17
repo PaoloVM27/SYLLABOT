@@ -80,13 +80,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Syllabot" },
       {
         name: "description",
-        content:
-          "Convierte tu sílabo universitario en un calendario (.ics) con IA.",
+        content: "Convierte tu sí­labo universitario en un calendario (.ics) con IA.",
       },
       { property: "og:title", content: "Syllabot" },
       {
         property: "og:description",
-        content: "Convierte tu sílabo universitario en un calendario (.ics) con IA.",
+        content: "Convierte tu sí­labo universitario en un calendario (.ics) con IA.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

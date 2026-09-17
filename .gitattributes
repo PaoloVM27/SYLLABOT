@@ -1,0 +1,21 @@
+﻿# Forzar LF en todos los archivos de texto
+* text=auto eol=lf
+
+# Archivos que siempre deben ser LF
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.json text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.html text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.py   text eol=lf
+
+# Archivos binarios (sin conversión)
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.pdf  binary
