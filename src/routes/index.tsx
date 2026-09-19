@@ -16,18 +16,21 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       {
-        title: "Syllabot â€” Tu sÃ­labo convertido en calendario con IA",
+        title: "Syllabot \u2014 Tu s\u00edlabo convertido en calendario con IA",
       },
       {
         name: "description",
         content:
-          "Sube tu sÃ­labo universitario en PDF o Word y Syllabot extrae exÃ¡menes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
+          "Sube tu s\u00edlabo universitario en PDF o Word y Syllabot extrae ex\u00e1menes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
       },
-      { property: "og:title", content: "Syllabot Ã¢â‚¬â€ Tu semestre organizado en segundos" },
+      {
+        property: "og:title",
+        content: "Syllabot \u2014 Tu semestre organizado en segundos",
+      },
       {
         property: "og:description",
         content:
-          "Sube tu sÃ­labo y nuestra IA extraerÃ¡ todas las fechas de exÃ¡menes y entregas directamente a tu Google Calendar.",
+          "Sube tu s\u00edlabo y nuestra IA extraer\u00e1 todas las fechas de ex\u00e1menes y entregas directamente a tu Google Calendar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -139,7 +142,7 @@ function Index() {
             <span className="text-lg font-semibold tracking-tight text-foreground">Syllabot</span>
           </a>
           <button className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
-            Iniciar SesiÃ³n
+            Iniciar Sesión
           </button>
         </div>
       </header>
@@ -150,7 +153,7 @@ function Index() {
           Tu semestre organizado en segundos, no en horas.
         </h1>
         <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Sube tu sÃ­labo y nuestra IA extraerÃ¡ todas las fechas de exÃ¡menes y entregas directamente
+          Sube tu s&iacute;labo y nuestra IA extraer&aacute; todas las fechas de ex&aacute;menes y entregas directamente
           a tu Google Calendar.
         </p>
 
@@ -186,7 +189,7 @@ function Index() {
                         Leyendo fechas con IA...
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Esto tomarÃ¡ solo unos segundos.
+                        Esto tomará solo unos segundos.
                       </p>
                     </div>
                   </>
@@ -220,7 +223,7 @@ function Index() {
                     </span>
                     <div>
                       <p className="text-lg font-semibold text-foreground">
-                        Arrastra tu sÃ­labo aquÃ­ o haz clic para buscar
+                        Arrastra tu s&iacute;labo aqu&iacute; o haz clic para buscar
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Formatos compatibles: PDF, Word (.docx)
@@ -253,12 +256,12 @@ function Index() {
               </span>
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  Â¡Tu calendario estÃ¡ listo!
+                  ¡Tu calendario está listo!
                 </h2>
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   Encontramos{" "}
                   <span className="font-semibold text-foreground">
-                    {eventCount} {eventCount === 1 ? "evaluaciÃ³n" : "evaluaciones"}
+                    {eventCount} {eventCount === 1 ? "evaluación" : "evaluaciones"}
                   </span>{" "}
                   en <span className="font-medium">{fileName}</span>.
                 </p>
@@ -276,7 +279,7 @@ function Index() {
                   className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 text-base font-medium text-foreground transition-colors hover:bg-muted"
                 >
                   <RotateCcw className="size-4" />
-                  Analizar otro sÃ­labo
+                  Analizar otro s&iacute;labo
                 </button>
               </div>
             </div>
@@ -287,7 +290,7 @@ function Index() {
               </span>
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  Algo saliÃ³ mal
+                  Algo salió mal
                 </h2>
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   {errorMessage}
@@ -308,7 +311,7 @@ function Index() {
       {/* Footer */}
       <footer className="border-t border-border/60 py-8">
         <p className="text-center text-sm text-muted-foreground">
-          Â© 2026 Syllabot Ã¢â‚¬â€ De sÃ­labos caÃ³ticos a semestres organizados.
+          &copy; 2026 Syllabot &mdash; De s&iacute;labos ca&oacute;ticos a semestres organizados.
         </p>
       </footer>
     </div>
