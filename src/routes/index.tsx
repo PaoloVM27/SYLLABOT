@@ -85,7 +85,7 @@ function Index() {
       const formData = new FormData();
       formData.append("file", fileObj);
 
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const API_URL = import.meta.env["VITE_API_URL"] || "http://localhost:8000";
       const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData,
@@ -153,8 +153,8 @@ function Index() {
           Tu semestre organizado en segundos, no en horas.
         </h1>
         <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Sube tu s&iacute;labo y nuestra IA extraer&aacute; todas las fechas de ex&aacute;menes y entregas directamente
-          a tu Google Calendar.
+          Sube tu s&iacute;labo y nuestra IA extraer&aacute; todas las fechas de ex&aacute;menes y
+          entregas directamente a tu Google Calendar.
         </p>
 
         {/* Dropzone */}
