@@ -82,7 +82,8 @@ function Index() {
       const formData = new FormData();
       formData.append("file", fileObj);
 
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";`n      const res = await fetch(`${API_URL}/upload`, {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const res = await fetch(${API_URL}/upload, {
         method: "POST",
         body: formData,
       });
