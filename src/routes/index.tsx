@@ -92,8 +92,15 @@ function Index() {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Error desconocido del servidor." }));
-        throw new Error(err.detail ?? `Error ${res.status}`);
+        let detail = `Error ${res.status}`;
+        try {
+          const errJson = await res.json();
+          detail = errJson.detail ?? detail;
+        } catch {
+          const text = await res.text().catch(() => "");
+          detail = text.slice(0, 200) || detail;
+        }
+        throw new Error(detail);
       }
 
       const blob = await res.blob();
