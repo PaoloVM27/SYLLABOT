@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Bot,
@@ -83,7 +83,7 @@ function Index() {
       formData.append("file", fileObj);
 
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-      const res = await fetch(${API_URL}/upload, {
+      const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData,
       });
