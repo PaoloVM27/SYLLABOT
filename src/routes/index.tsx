@@ -16,21 +16,21 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       {
-        title: "Syllabot \u2014 Tu s\u00edlabo convertido en calendario con IA",
+        title: "Syllabot Tu sílabo convertido en calendario con IA",
       },
       {
         name: "description",
         content:
-          "Sube tu s\u00edlabo universitario en PDF o Word y Syllabot extrae ex\u00e1menes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
+          "Sube tu sílabo universitario en PDF o Word y Syllabot extrae exámenes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
       },
       {
         property: "og:title",
-        content: "Syllabot \u2014 Tu semestre organizado en segundos",
+        content: "Syllabot Tu semestre organizado en segundos",
       },
       {
         property: "og:description",
         content:
-          "Sube tu s\u00edlabo y nuestra IA extraer\u00e1 todas las fechas de ex\u00e1menes y entregas directamente a tu Google Calendar.",
+          "Sube tu sílabo y nuestra IA extraerá todas las fechas de exámenes y entregas directamente a tu Google Calendar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
