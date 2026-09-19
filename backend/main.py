@@ -108,17 +108,28 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     # 2. Enviar a Gemini con Structured Output
     prompt = PROMPT_TEMPLATE.format(texto=raw_text)
-    try:
-        gemini_response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=EvaluacionesResponse,
-            ),
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error al llamar a Gemini: {str(e)}")
+    import time
+    last_error = None
+    for attempt in range(3):
+        try:
+            gemini_response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=EvaluacionesResponse,
+                ),
+            )
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            if "503" in str(e) or "UNAVAILABLE" in str(e):
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s
+                continue
+            raise HTTPException(status_code=502, detail=f"Error al llamar a Gemini: {str(e)}")
+    if last_error:
+        raise HTTPException(status_code=502, detail=f"Error al llamar a Gemini: {str(last_error)}")
 
     try:
         parsed = json.loads(gemini_response.text)
