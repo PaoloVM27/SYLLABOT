@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Bot,
@@ -16,18 +16,18 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       {
-        title: "Syllabot — Tu sílabo convertido en calendario con IA",
+        title: "Syllabot â€” Tu sÃ­labo convertido en calendario con IA",
       },
       {
         name: "description",
         content:
-          "Sube tu sílabo universitario en PDF o Word y Syllabot extrae exámenes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
+          "Sube tu sÃ­labo universitario en PDF o Word y Syllabot extrae exÃ¡menes y entregas con IA para generar un archivo .ics listo para Google Calendar.",
       },
-      { property: "og:title", content: "Syllabot â€” Tu semestre organizado en segundos" },
+      { property: "og:title", content: "Syllabot Ã¢â‚¬â€ Tu semestre organizado en segundos" },
       {
         property: "og:description",
         content:
-          "Sube tu sílabo y nuestra IA extraerá todas las fechas de exámenes y entregas directamente a tu Google Calendar.",
+          "Sube tu sÃ­labo y nuestra IA extraerÃ¡ todas las fechas de exÃ¡menes y entregas directamente a tu Google Calendar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -82,7 +82,7 @@ function Index() {
       const formData = new FormData();
       formData.append("file", fileObj);
 
-      const res = await fetch("http://localhost:8000/upload", {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";`n      const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -138,7 +138,7 @@ function Index() {
             <span className="text-lg font-semibold tracking-tight text-foreground">Syllabot</span>
           </a>
           <button className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
-            Iniciar Sesión
+            Iniciar SesiÃ³n
           </button>
         </div>
       </header>
@@ -149,7 +149,7 @@ function Index() {
           Tu semestre organizado en segundos, no en horas.
         </h1>
         <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Sube tu sílabo y nuestra IA extraerá todas las fechas de exámenes y entregas directamente
+          Sube tu sÃ­labo y nuestra IA extraerÃ¡ todas las fechas de exÃ¡menes y entregas directamente
           a tu Google Calendar.
         </p>
 
@@ -185,7 +185,7 @@ function Index() {
                         Leyendo fechas con IA...
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Esto tomará solo unos segundos.
+                        Esto tomarÃ¡ solo unos segundos.
                       </p>
                     </div>
                   </>
@@ -219,7 +219,7 @@ function Index() {
                     </span>
                     <div>
                       <p className="text-lg font-semibold text-foreground">
-                        Arrastra tu sílabo aquí o haz clic para buscar
+                        Arrastra tu sÃ­labo aquÃ­ o haz clic para buscar
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Formatos compatibles: PDF, Word (.docx)
@@ -252,12 +252,12 @@ function Index() {
               </span>
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  ¡Tu calendario está listo!
+                  Â¡Tu calendario estÃ¡ listo!
                 </h2>
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   Encontramos{" "}
                   <span className="font-semibold text-foreground">
-                    {eventCount} {eventCount === 1 ? "evaluación" : "evaluaciones"}
+                    {eventCount} {eventCount === 1 ? "evaluaciÃ³n" : "evaluaciones"}
                   </span>{" "}
                   en <span className="font-medium">{fileName}</span>.
                 </p>
@@ -275,7 +275,7 @@ function Index() {
                   className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card px-6 text-base font-medium text-foreground transition-colors hover:bg-muted"
                 >
                   <RotateCcw className="size-4" />
-                  Analizar otro sílabo
+                  Analizar otro sÃ­labo
                 </button>
               </div>
             </div>
@@ -286,7 +286,7 @@ function Index() {
               </span>
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  Algo salió mal
+                  Algo saliÃ³ mal
                 </h2>
                 <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                   {errorMessage}
@@ -307,7 +307,7 @@ function Index() {
       {/* Footer */}
       <footer className="border-t border-border/60 py-8">
         <p className="text-center text-sm text-muted-foreground">
-          © 2026 Syllabot â€” De sílabos caóticos a semestres organizados.
+          Â© 2026 Syllabot Ã¢â‚¬â€ De sÃ­labos caÃ³ticos a semestres organizados.
         </p>
       </footer>
     </div>
