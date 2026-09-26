@@ -88,7 +88,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content: "Convierte tu sí­labo universitario en un calendario (.ics) con IA.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://syllabot-red.vercel.app/SYLLABOT.png" },
+      { property: "og:url", content: "https://syllabot-red.vercel.app" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://syllabot-red.vercel.app/SYLLABOT.png" },
       { name: "theme-color", content: "#fcfbf8" },
     ],
     links: [
@@ -96,7 +99,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/SYLLABOT.png", type: "image/png" },
       {
         rel: "preconnect",
         href: "https://fonts.googleapis.com",
