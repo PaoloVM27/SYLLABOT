@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -137,18 +137,5 @@ async def upload_pdf(file: UploadFile = File(...)):
     except json.JSONDecodeError:
         raise HTTPException(status_code=502, detail="Gemini devolvió una respuesta no válida.")
 
-    # 3. Generar el archivo .ics
-    try:
-        ics_bytes = build_ics(evaluaciones)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al generar el calendario: {str(e)}")
-
-    # 4. Retornar el archivo con headers de descarga
-    filename = (file.filename or "evaluaciones").replace(".pdf", "")
-    return Response(
-        content=ics_bytes,
-        media_type="text/calendar; charset=utf-8",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}.ics"',
-        },
-    )
+    # 3. Retornar los eventos en formato JSON
+    return JSONResponse(content={"evaluaciones": evaluaciones})
