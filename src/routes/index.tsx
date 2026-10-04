@@ -69,10 +69,12 @@ function Index() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [events, setEvents] = useState<SyllabotEvent[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const acceptFile = useCallback((name: string) => {
-    setFileName(name);
+  const acceptFile = useCallback((file: File) => {
+    setSelectedFile(file);
+    setFileName(file.name);
     setPhase("file");
   }, []);
 
@@ -81,13 +83,12 @@ function Index() {
     if (!input) return;
     const handler = (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) acceptFile(file.name);
+      if (file) acceptFile(file);
     };
     input.addEventListener("change", handler);
     return () => input.removeEventListener("change", handler);
   }, [acceptFile]);
 
-  // Guard: mostrar login si no autenticado (MOVIDO DESPUÉS DE LOS HOOKS)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#07091a]">
@@ -101,12 +102,11 @@ function Index() {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) acceptFile(file.name);
+    if (file) acceptFile(file);
   };
 
   const generate = async () => {
-    const fileObj = inputRef.current?.files?.[0];
-    if (phase !== "file" || !fileObj) return;
+    if (phase !== "file" || !selectedFile) return;
 
     setPhase("loading");
     setErrorMessage("");
@@ -114,9 +114,9 @@ function Index() {
 
     try {
       const formData = new FormData();
-      formData.append("file", fileObj);
+      formData.append("file", selectedFile);
 
-      const API_URL = import.meta.env["VITE_API_URL"] || "http://localhost:8000";
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
       const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData,
@@ -170,6 +170,7 @@ function Index() {
     setFileName("");
     setErrorMessage("");
     setEvents([]);
+    setSelectedFile(null);
     if (inputRef.current) inputRef.current.value = "";
   };
 
