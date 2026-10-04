@@ -409,6 +409,10 @@ function Index() {
                 tooltipAccessor="tooltip"
                 style={{ height: "100%", minHeight: 400 }}
                 culture="es"
+                length={150} // Muestra 5 meses de eventos juntos en la agenda (un semestre entero)
+                formats={{
+                  agendaDateFormat: "dd/MM/yyyy",
+                }}
                 messages={{
                   next: "Sig",
                   previous: "Ant",
