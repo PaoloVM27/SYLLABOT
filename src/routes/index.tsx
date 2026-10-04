@@ -137,25 +137,31 @@ function Index() {
       // El backend ahora devuelve JSON
       const data = await res.json();
 
-      const validEvaluaciones = (data.evaluaciones || []).filter(
-        (ev: any) => ev.fecha && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000")
-      );
-
-      const parsedEvents = validEvaluaciones.map(
+      const parsedEvents = (data.evaluaciones || []).map(
         (ev: {
           nombre: string;
           fecha: string;
           peso?: number;
         }) => {
-          // Limpiamos la fecha por si viene con slashes
-          const cleanDate = ev.fecha.replace(/\//g, "-");
-          const startDate = new Date(cleanDate + "T10:00:00");
+          let startDate = new Date();
+          let hasExactDate = false;
+
+          if (ev.fecha && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000")) {
+            const cleanDate = ev.fecha.replace(/\//g, "-");
+            const parsedDate = new Date(cleanDate + "T10:00:00");
+            if (!isNaN(parsedDate.getTime())) {
+              startDate = parsedDate;
+              hasExactDate = true;
+            }
+          }
+
           const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+          const dateWarning = hasExactDate ? "" : " ⚠️ (Día sin especificar)";
 
           return {
-            title: ev.nombre + (ev.peso ? ` (${ev.peso}%)` : ""),
-            start: isNaN(startDate.getTime()) ? new Date() : startDate,
-            end: isNaN(endDate.getTime()) ? new Date() : endDate,
+            title: ev.nombre + (ev.peso ? ` (${ev.peso}%)` : "") + dateWarning,
+            start: startDate,
+            end: endDate,
             description: `Peso de la evaluación: ${ev.peso || "No especificado"}%`,
           };
         }
