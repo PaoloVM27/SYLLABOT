@@ -114,7 +114,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     prompt = PROMPT_TEMPLATE.format(texto=raw_text)
     import time
     last_error = None
-    for attempt in range(3):
+    for attempt in range(5): # Aumentado a 5 intentos
         try:
             gemini_response = client.models.generate_content(
                 model="gemini-3.6-flash",
@@ -128,12 +128,19 @@ async def upload_pdf(file: UploadFile = File(...)):
             break
         except Exception as e:
             last_error = e
-            if "503" in str(e) or "UNAVAILABLE" in str(e):
-                time.sleep(2 ** attempt)  # 1s, 2s, 4s
+            # Si hay error de saturación o límite de peticiones (429, 503)
+            if "503" in str(e) or "UNAVAILABLE" in str(e) or "429" in str(e) or "Quota" in str(e):
+                time.sleep(2)  # Espera 2 segundos exactos entre intentos
                 continue
-            raise HTTPException(status_code=502, detail=f"Error al llamar a Gemini: {str(e)}")
+            # Si es otro error raro, rompemos de inmediato
+            raise HTTPException(status_code=502, detail="Error interno al comunicarse con la Inteligencia Artificial.")
+            
     if last_error:
-        raise HTTPException(status_code=502, detail=f"Error al llamar a Gemini: {str(last_error)}")
+        # Si después de 5 intentos sigue fallando, mandamos un mensaje amigable al usuario
+        raise HTTPException(
+            status_code=503, 
+            detail="Los servidores de IA están muy saturados en este momento. Por favor, espera unos segundos e inténtalo de nuevo."
+        )
 
     try:
         from datetime import datetime, timedelta
