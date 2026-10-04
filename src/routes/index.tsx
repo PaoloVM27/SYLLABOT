@@ -159,7 +159,8 @@ function Index() {
           const dateWarning = hasExactDate ? "" : " ⚠️ (Día sin especificar)";
 
           return {
-            title: ev.nombre + (ev.peso ? ` (${ev.peso}%)` : "") + dateWarning,
+            title: ev.nombre, // Solo el nombre corto para el cuadradito
+            tooltip: `${ev.nombre}${ev.peso ? ` (${ev.peso}%)` : ""}${dateWarning}`, // Detalle completo para el hover
             start: startDate,
             end: endDate,
             description: `Peso de la evaluación: ${ev.peso || "No especificado"}%`,
@@ -405,6 +406,7 @@ function Index() {
                 events={events}
                 startAccessor="start"
                 endAccessor="end"
+                tooltipAccessor="tooltip"
                 style={{ height: "100%", minHeight: 400 }}
                 culture="es"
                 messages={{
