@@ -33,15 +33,24 @@ class EvaluacionesResponse(typing.TypedDict):
 
 
 PROMPT_TEMPLATE = """
-Eres un asistente que extrae evaluaciones académicas de documentos universitarios (sílabos, programas de curso, etc.).
+Eres un asistente experto en analizar documentos académicos (sílabos, programas de curso).
 
-A partir del siguiente texto, identifica TODAS las evaluaciones, exámenes, tareas, proyectos o actividades calificadas.
-Devuelve únicamente el JSON solicitado, sin texto adicional.
+Tu objetivo es extraer TODAS las evaluaciones, exámenes, prácticas, tareas o proyectos calificados.
+Devuelve ÚNICAMENTE el JSON solicitado, sin texto adicional.
+
+REGLA CRÍTICA PARA LAS FECHAS:
+Muchos sílabos no dan el día exacto de la evaluación, sino la semana (ej. "Semana 8").
+SIEMPRE debes intentar calcular la fecha exacta (YYYY-MM-DD) usando esta lógica matemática:
+1. Busca la "Fecha de inicio" del ciclo en el documento (ej. 24/08/2026).
+2. Busca qué día de la semana se dicta la clase (ej. "Martes").
+3. Determina la fecha del primer día de clases de la Semana 1.
+4. Suma 7 días por cada semana adicional hasta llegar a la semana de la evaluación (ej. Semana 8 = Fecha inicio clases + 7 semanas).
+Solo usa "0000-00-00" si es matemáticamente imposible calcular o inferir la fecha.
 
 Para cada evaluación proporciona:
-- nombre: nombre descriptivo de la evaluación.
-- fecha: fecha en formato YYYY-MM-DD. Si no hay fecha exacta usa "0000-00-00".
-- peso: porcentaje de la nota final como número entero (ej: 30). Si no hay peso usa 0.
+- nombre: nombre descriptivo (ej. "Examen Parcial").
+- fecha: fecha exacta en formato YYYY-MM-DD calculada según la regla anterior.
+- peso: porcentaje de la nota final como número entero (ej: 30). Si no hay, usa 0.
 
 Texto del documento:
 \"\"\"
@@ -113,7 +122,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     for attempt in range(3):
         try:
             gemini_response = client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-3.6-pro",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
