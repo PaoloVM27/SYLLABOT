@@ -78,17 +78,6 @@ function Index() {
     setPhase("file");
   }, []);
 
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    const handler = (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) acceptFile(file);
-    };
-    input.addEventListener("change", handler);
-    return () => input.removeEventListener("change", handler);
-  }, [acceptFile]);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#07091a]">
@@ -249,6 +238,10 @@ function Index() {
                     accept=".pdf,.doc,.docx"
                     className="hidden"
                     disabled={phase === "loading"}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) acceptFile(file);
+                    }}
                   />
                   {phase === "loading" ? (
                     <>
