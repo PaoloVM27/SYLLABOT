@@ -40,9 +40,13 @@ Extrae la siguiente información global del curso:
 - fecha_inicio: Fecha de inicio de clases en formato YYYY-MM-DD (busca en los datos generales, ej. 24/08/2026 -> 2026-08-24). Si no la hay, usa "0000-00-00".
 - dia_clases: El día principal de la semana en el que se dicta la clase (ej. "Martes"). Usa solo una palabra en español, sin tildes. Si no hay, usa "".
 
-Luego, extrae TODAS las evaluaciones, prácticas, exámenes o entregables:
-- nombre: nombre descriptivo (ej. "Examen Parcial").
-- semana: número entero de la semana en la que ocurre (ej. 8). Si el sílabo no menciona semana exacta, usa 0.
+Luego, extrae ÚNICAMENTE las evaluaciones principales e hitos importantes del curso:
+- SÍ DEBES EXTRAER: "Práctica calificada" (PC), "Examen Parcial", "Examen Final", "Avance de proyecto", "Entregable de proyecto", "Desarrollo de proyecto", "Proyecto final" o similares que sean hitos calificados.
+- NO DEBES EXTRAER: Ignora por completo actividades rutinarias como "Laboratorio", "Práctica dirigida", "Discusión", "Desarrollo de algoritmos", u otros que se dan siempre y no son hitos principales.
+
+Para cada evaluación principal extraída proporciona:
+- nombre: nombre descriptivo (ej. "Práctica Calificada 1", "Avance de Proyecto Final").
+- semana: número entero de la semana en la que ocurre (ej. 8). Si el sílabo no menciona semana exacta, usa 0. Asegúrate de leer bien la columna de la semana donde aparece el hito.
 - peso: porcentaje de la nota final (ej. 30). Si no hay, usa 0.
 
 Devuelve ÚNICAMENTE el JSON solicitado.
