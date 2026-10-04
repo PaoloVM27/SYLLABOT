@@ -137,21 +137,25 @@ function Index() {
       // El backend ahora devuelve JSON
       const data = await res.json();
 
-      const parsedEvents = (data.evaluaciones || []).map(
+      const validEvaluaciones = (data.evaluaciones || []).filter(
+        (ev: any) => ev.fecha && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000")
+      );
+
+      const parsedEvents = validEvaluaciones.map(
         (ev: {
           nombre: string;
           fecha: string;
           peso?: number;
         }) => {
-          // Añadimos T10:00:00 para evitar que el ajuste de zona horaria (UTC a Lima) 
-          // desplace la fecha al día anterior.
-          const startDate = new Date(ev.fecha + "T10:00:00");
-          const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 horas de duración
+          // Limpiamos la fecha por si viene con slashes
+          const cleanDate = ev.fecha.replace(/\//g, "-");
+          const startDate = new Date(cleanDate + "T10:00:00");
+          const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
 
           return {
             title: ev.nombre + (ev.peso ? ` (${ev.peso}%)` : ""),
-            start: startDate,
-            end: endDate,
+            start: isNaN(startDate.getTime()) ? new Date() : startDate,
+            end: isNaN(endDate.getTime()) ? new Date() : endDate,
             description: `Peso de la evaluación: ${ev.peso || "No especificado"}%`,
           };
         }
