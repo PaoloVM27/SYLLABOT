@@ -60,6 +60,8 @@ interface SyllabotEvent {
   start: Date;
   end: Date;
   description?: string;
+  tooltip?: string;
+  hasExactDate?: boolean;
 }
 
 function Index() {
@@ -68,6 +70,7 @@ function Index() {
   const [fileName, setFileName] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [events, setEvents] = useState<SyllabotEvent[]>([]);
+  const [calendarView, setCalendarView] = useState<string>("month");
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,29 +126,29 @@ function Index() {
         throw new Error(detail);
       }
 
-      // El backend ahora devuelve JSON
       const data = await res.json();
 
-      const validEvaluaciones = (data.evaluaciones || []).filter(
-        (ev: any) => ev.fecha && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000")
-      );
-
-      const parsedEvents = validEvaluaciones.map(
+      const parsedEvents = (data.evaluaciones || []).map(
         (ev: {
           nombre: string;
           fecha: string;
           peso?: number;
         }) => {
-          const cleanDate = ev.fecha.replace(/\//g, "-");
+          const hasExactDate = ev.fecha && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000");
+          let cleanDate = hasExactDate ? ev.fecha.replace(/\//g, "-") : new Date().toISOString().split("T")[0];
+          
           const startDate = new Date(cleanDate + "T10:00:00");
           const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
 
+          const dateWarning = hasExactDate ? "" : " ⚠️ (Fecha sin especificar)";
+
           return {
-            title: ev.nombre,
-            tooltip: `${ev.nombre}${ev.peso ? ` (${ev.peso}%)` : ""}`,
+            title: ev.nombre + dateWarning,
+            tooltip: `${ev.nombre}${ev.peso ? ` (${ev.peso}%)` : ""}${dateWarning}`,
             start: isNaN(startDate.getTime()) ? new Date() : startDate,
             end: isNaN(endDate.getTime()) ? new Date() : endDate,
             description: `Peso de la evaluación: ${ev.peso || "No especificado"}%`,
+            hasExactDate: hasExactDate,
           };
         }
       );
@@ -389,7 +392,8 @@ function Index() {
             >
               <Calendar
                 localizer={localizer}
-                events={events}
+                events={calendarView === "month" ? events.filter(e => e.hasExactDate !== false) : events}
+                onView={(view) => setCalendarView(view)}
                 startAccessor="start"
                 endAccessor="end"
                 tooltipAccessor="tooltip"
