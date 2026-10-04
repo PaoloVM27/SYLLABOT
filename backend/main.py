@@ -24,33 +24,28 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 # --- Esquema de Structured Output ---
 class Evaluacion(typing.TypedDict):
     nombre: str
-    fecha: str   # formato YYYY-MM-DD
+    semana: int  # ej. 8
     peso: int
 
-
 class EvaluacionesResponse(typing.TypedDict):
+    fecha_inicio: str  # YYYY-MM-DD
+    dia_clases: str    # "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"
     evaluaciones: list[Evaluacion]
 
 
 PROMPT_TEMPLATE = """
-Eres un asistente experto en analizar documentos académicos (sílabos, programas de curso).
+Eres un asistente que extrae datos de sílabos universitarios.
 
-Tu objetivo es extraer TODAS las evaluaciones, exámenes, prácticas, tareas o proyectos calificados.
-Devuelve ÚNICAMENTE el JSON solicitado, sin texto adicional.
+Extrae la siguiente información global del curso:
+- fecha_inicio: Fecha de inicio de clases en formato YYYY-MM-DD (busca en los datos generales, ej. 24/08/2026 -> 2026-08-24). Si no la hay, usa "0000-00-00".
+- dia_clases: El día principal de la semana en el que se dicta la clase (ej. "Martes"). Usa solo una palabra en español, sin tildes. Si no hay, usa "".
 
-REGLA CRÍTICA PARA LAS FECHAS:
-Muchos sílabos no dan el día exacto de la evaluación, sino la semana (ej. "Semana 8").
-SIEMPRE debes intentar calcular la fecha exacta (YYYY-MM-DD) usando esta lógica matemática:
-1. Busca la "Fecha de inicio" del ciclo en el documento (ej. 24/08/2026).
-2. Busca qué día de la semana se dicta la clase (ej. "Martes").
-3. Determina la fecha del primer día de clases de la Semana 1.
-4. Suma 7 días por cada semana adicional hasta llegar a la semana de la evaluación (ej. Semana 8 = Fecha inicio clases + 7 semanas).
-Solo usa "0000-00-00" si es matemáticamente imposible calcular o inferir la fecha.
-
-Para cada evaluación proporciona:
+Luego, extrae TODAS las evaluaciones, prácticas, exámenes o entregables:
 - nombre: nombre descriptivo (ej. "Examen Parcial").
-- fecha: fecha exacta en formato YYYY-MM-DD calculada según la regla anterior.
-- peso: porcentaje de la nota final como número entero (ej: 30). Si no hay, usa 0.
+- semana: número entero de la semana en la que ocurre (ej. 8). Si el sílabo no menciona semana exacta, usa 0.
+- peso: porcentaje de la nota final (ej. 30). Si no hay, usa 0.
+
+Devuelve ÚNICAMENTE el JSON solicitado.
 
 Texto del documento:
 \"\"\"
@@ -122,7 +117,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     for attempt in range(3):
         try:
             gemini_response = client.models.generate_content(
-                model="gemini-3.6-pro",
+                model="gemini-1.5-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -141,8 +136,49 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail=f"Error al llamar a Gemini: {str(last_error)}")
 
     try:
+        from datetime import datetime, timedelta
+        
         parsed = json.loads(gemini_response.text)
-        evaluaciones = parsed.get("evaluaciones", [])
+        fecha_inicio_str = parsed.get("fecha_inicio", "0000-00-00")
+        dia_clases_str = parsed.get("dia_clases", "")
+        raw_evaluaciones = parsed.get("evaluaciones", [])
+        
+        dias_map = {
+            "lunes": 0, "martes": 1, "miercoles": 2, "jueves": 3,
+            "viernes": 4, "sabado": 5, "domingo": 6
+        }
+        
+        evaluaciones = []
+        
+        start_date = None
+        if fecha_inicio_str and fecha_inicio_str != "0000-00-00":
+            try:
+                start_date = datetime.strptime(fecha_inicio_str, "%Y-%m-%d")
+            except ValueError:
+                pass
+                
+        target_weekday = dias_map.get(dia_clases_str.lower().strip(), -1)
+        
+        first_class_date = None
+        if start_date and target_weekday != -1:
+            days_ahead = target_weekday - start_date.weekday()
+            if days_ahead < 0:
+                days_ahead += 7
+            first_class_date = start_date + timedelta(days=days_ahead)
+            
+        for ev in raw_evaluaciones:
+            semana = ev.get("semana", 0)
+            fecha_final = "0000-00-00"
+            if semana > 0 and first_class_date:
+                eval_date = first_class_date + timedelta(days=(semana - 1) * 7)
+                fecha_final = eval_date.strftime("%Y-%m-%d")
+                
+            evaluaciones.append({
+                "nombre": ev.get("nombre", "Evaluación"),
+                "fecha": fecha_final,
+                "peso": ev.get("peso", 0)
+            })
+
     except json.JSONDecodeError:
         raise HTTPException(status_code=502, detail="Gemini devolvió una respuesta no válida.")
 
