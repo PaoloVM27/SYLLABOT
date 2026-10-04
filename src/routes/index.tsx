@@ -62,6 +62,8 @@ interface SyllabotEvent {
   description?: string;
   tooltip?: string;
   hasExactDate?: boolean;
+  isVagueDate?: boolean;
+  vagueDateRef?: number;
 }
 
 function Index() {
@@ -71,6 +73,7 @@ function Index() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [events, setEvents] = useState<SyllabotEvent[]>([]);
   const [calendarView, setCalendarView] = useState<string>("month");
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -128,6 +131,20 @@ function Index() {
 
       const data = await res.json();
 
+      let minDate = new Date();
+      const exactDates = (data.evaluaciones || []).filter(
+        (e: any) => e.fecha && e.fecha !== "0000-00-00" && !e.fecha.includes("0000")
+      );
+      if (exactDates.length > 0) {
+        const times = exactDates.map((e: any) => new Date(e.fecha.replace(/\//g, "-") + "T10:00:00").getTime());
+        minDate = new Date(Math.min(...times));
+      }
+
+      // Fecha especial para agrupar los eventos vagos (1 día antes del primer evento)
+      const vagueDate = new Date(minDate);
+      vagueDate.setDate(vagueDate.getDate() - 1);
+      vagueDate.setHours(0, 0, 0, 0);
+
       const parsedEvents = (data.evaluaciones || []).map(
         (ev: {
           nombre: string;
@@ -135,25 +152,33 @@ function Index() {
           peso?: number;
         }) => {
           const hasExactDate = ev.fecha && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000");
-          let cleanDate = hasExactDate ? ev.fecha.replace(/\//g, "-") : new Date().toISOString().split("T")[0];
           
-          const startDate = new Date(cleanDate + "T10:00:00");
+          let startDate: Date;
+          if (hasExactDate) {
+            startDate = new Date(ev.fecha.replace(/\//g, "-") + "T10:00:00");
+          } else {
+            startDate = new Date(vagueDate);
+            startDate.setHours(10, 0, 0, 0); // Evitar problemas de zona horaria
+          }
+          
           const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-
-          const dateWarning = hasExactDate ? "" : " ⚠️ (Fecha sin especificar)";
+          const dateWarning = hasExactDate ? "" : " ⚠️";
 
           return {
             title: ev.nombre + dateWarning,
-            tooltip: `${ev.nombre}${ev.peso ? ` (${ev.peso}%)` : ""}${dateWarning}`,
+            tooltip: `${ev.nombre}${ev.peso ? ` (${ev.peso}%)` : ""}${hasExactDate ? "" : " (Fecha sin especificar)"}`,
             start: isNaN(startDate.getTime()) ? new Date() : startDate,
             end: isNaN(endDate.getTime()) ? new Date() : endDate,
             description: `Peso de la evaluación: ${ev.peso || "No especificado"}%`,
             hasExactDate: hasExactDate,
+            isVagueDate: !hasExactDate,
+            vagueDateRef: vagueDate.getTime()
           };
         }
       );
 
       setEvents(parsedEvents);
+      setCurrentDate(vagueDate);
       setPhase("success");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Error al conectar con el servidor.");
@@ -167,6 +192,7 @@ function Index() {
     setErrorMessage("");
     setEvents([]);
     setSelectedFile(null);
+    setCurrentDate(new Date());
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -394,6 +420,8 @@ function Index() {
                 localizer={localizer}
                 events={calendarView === "month" ? events.filter(e => e.hasExactDate !== false) : events}
                 onView={(view) => setCalendarView(view)}
+                date={currentDate}
+                onNavigate={(newDate) => setCurrentDate(newDate)}
                 startAccessor="start"
                 endAccessor="end"
                 tooltipAccessor="tooltip"
@@ -402,6 +430,25 @@ function Index() {
                 length={150} // Muestra 5 meses de eventos juntos en la agenda (un semestre entero)
                 formats={{
                   agendaDateFormat: "dd/MM/yyyy",
+                }}
+                components={{
+                  agenda: {
+                    date: ({ day, label }: any) => {
+                      // day es medianoche de ese día. Comparamos con nuestra fecha vaga.
+                      // Los eventos vagos se agrupan todos en el mismo "vagueDateRef"
+                      const isVagueDateGroup = events.some(e => e.isVagueDate && new Date(e.vagueDateRef!).getTime() === day.getTime());
+                      if (isVagueDateGroup) {
+                        return <span className="font-semibold text-amber-600">Sin especificar</span>;
+                      }
+                      return <span>{label}</span>;
+                    },
+                    time: ({ event, label }: any) => {
+                      if (event.isVagueDate) {
+                        return <span className="text-muted-foreground italic">Por confirmar</span>;
+                      }
+                      return <span>{label}</span>;
+                    }
+                  }
                 }}
                 messages={{
                   next: "Sig",
