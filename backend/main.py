@@ -196,13 +196,11 @@ async def upload_pdf(file: UploadFile = File(...)):
     fecha_inicio_str = parsed.get("fecha_inicio", "0000-00-00")
     dia_clases_str = parsed.get("dia_clases", "")
     raw_evaluaciones = parsed.get("evaluaciones", [])
-    
     dias_map = {
-            "lunes": 0, "martes": 1, "miercoles": 2, "jueves": 3,
-            "viernes": 4, "sabado": 5, "domingo": 6
-        }
-        
-        evaluaciones = []
+        "lunes": 0, "martes": 1, "miercoles": 2, "jueves": 3,
+        "viernes": 4, "sabado": 5, "domingo": 6
+    }
+    
     evaluaciones = []
     
     start_date = None
