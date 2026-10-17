@@ -106,16 +106,18 @@ export function LoginScreen() {
       <main className="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 py-8">
         {/* Columna Izquierda: Mascota y Presentación de Valor */}
         <div className="flex-1 flex flex-col items-center text-center lg:items-start lg:text-left max-w-xl">
-          {/* Mascota con aura */}
-          <div className="relative mb-4">
-            <div className="absolute -inset-4 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
-            <motion.img
-              src="/syllabot_01_neutral.png"
-              alt="Mascota Syllabot"
-              className="relative w-52 h-52 sm:w-64 sm:h-64 object-contain drop-shadow-[0_15px_30px_rgba(99,102,241,0.3)]"
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            />
+          {/* Mascota centrada con aura y tamaño aumentado */}
+          <div className="w-full flex justify-center mb-6">
+            <div className="relative">
+              <div className="absolute -inset-6 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+              <motion.img
+                src="/syllabot_01_neutral.png"
+                alt="Mascota Syllabot"
+                className="relative w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80 object-contain drop-shadow-[0_20px_40px_rgba(99,102,241,0.35)]"
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
           </div>
 
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
@@ -150,10 +152,10 @@ export function LoginScreen() {
             </div>
           </div>
 
-          {/* Badge Sanmarquinos */}
+          {/* Badge Informativo (sin redundancia de UNMSM) */}
           <div className="mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
             <span className="size-2 rounded-full bg-emerald-400" />
-            Plataforma oficial para Sanmarquinos
+            Sincronización instantánea con Google Calendar
           </div>
         </div>
 
@@ -279,7 +281,7 @@ export function LoginScreen() {
 
       {/* ── Footer: Izquierda Copyright, Derecha Enlaces Sutiles ── */}
       <footer className="relative z-20 flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 text-xs text-white/40">
-        <p>&copy; 2026 Syllabot &mdash; Solo para estudiantes UNMSM</p>
+        <p>&copy; 2026 Syllabot. Todos los derechos reservados.</p>
 
         <div className="flex items-center gap-5">
           <span className="hover:text-white/70 transition-colors cursor-pointer">Privacidad</span>
