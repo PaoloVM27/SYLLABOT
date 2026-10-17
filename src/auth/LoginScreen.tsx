@@ -160,10 +160,10 @@ export function LoginScreen() {
         </div>
 
         {/* Columna Derecha: Tarjeta de Acceso Limpia con Botón Blanco */}
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-[460px]">
           <motion.div
             layout
-            className="bg-[#0b0e24]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-7 sm:p-9 shadow-[0_25px_50px_rgba(0,0,0,0.6)] relative overflow-hidden"
+            className="bg-[#141838]/90 backdrop-blur-2xl border border-indigo-400/25 rounded-[2.2rem] p-8 sm:p-10 shadow-[0_25px_60px_rgba(0,0,0,0.65),_0_0_40px_rgba(99,102,241,0.15)] relative overflow-hidden"
           >
             <ScanningLine />
 
@@ -177,8 +177,10 @@ export function LoginScreen() {
                   className="space-y-6 relative z-10"
                 >
                   <div>
-                    <h2 className="text-white text-2xl font-bold tracking-tight">Iniciar sesión</h2>
-                    <p className="text-white/50 text-xs sm:text-sm mt-1">
+                    <h2 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+                      Iniciar sesión
+                    </h2>
+                    <p className="text-white/60 text-xs sm:text-sm mt-1.5">
                       Usa tu cuenta institucional para continuar
                     </p>
                   </div>
@@ -186,7 +188,7 @@ export function LoginScreen() {
                   {/* Botón Blanco Oficial de Google */}
                   <button
                     onClick={handleGoogle}
-                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-semibold py-3.5 px-4 rounded-xl shadow-sm hover:bg-gray-100 active:scale-[0.99] transition-all text-sm sm:text-base cursor-pointer"
+                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-bold py-4 px-5 rounded-2xl shadow-md hover:bg-gray-100 active:scale-[0.99] transition-all text-base cursor-pointer"
                   >
                     <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0">
                       <path
@@ -210,10 +212,10 @@ export function LoginScreen() {
                   </button>
 
                   {/* Restricción de Dominio con Candado */}
-                  <div className="flex items-center justify-center gap-1.5 text-xs text-white/50">
-                    <Lock size={12} className="shrink-0 text-white/40" />
+                  <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm text-white/60">
+                    <Lock size={13} className="shrink-0 text-white/50" />
                     <span>
-                      Solo cuentas <strong className="text-white/90">@unmsm.edu.pe</strong>
+                      Solo cuentas <strong className="text-white">@unmsm.edu.pe</strong>
                     </span>
                   </div>
 
