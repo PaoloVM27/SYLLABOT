@@ -93,36 +93,22 @@ export function LoginScreen() {
       <FloatingParticles />
 
       {/* ── Top Bar: Logo oficial en la esquina superior izquierda ── */}
-      <header className="relative z-20 flex items-center gap-2.5">
+      <header className="relative z-20 flex items-center gap-3">
         <img
           src="/SYLLABOT.png"
           alt="Syllabot Logo"
           className="size-8 object-contain drop-shadow-md"
         />
         <span className="text-xl font-bold tracking-tight text-white">Syllabot</span>
-        <span className="size-5 rounded-full bg-[#06b6d4]/20 text-[#22d3ee] border border-[#06b6d4]/40 text-[10px] font-bold flex items-center justify-center">
-          3
-        </span>
       </header>
 
       {/* ── Contenedor Central: Dos Columnas (Referencia de Diseño) ── */}
       <main className="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 py-8">
-        {/* Columna Izquierda: Mascota y Presentación de Valor */}
-        <div className="flex-1 flex flex-col items-center text-center lg:items-start lg:text-left max-w-xl">
-          {/* Mascota con título SYLLABOT gigante semitransparente detrás */}
-          <div className="w-full flex justify-center mb-4 relative">
-            {/* Texto de marca gigante en capa trasera semitransparente */}
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
-              aria-hidden="true"
-            >
-              <span className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-widest text-white/[0.08] uppercase whitespace-nowrap">
-                SYLLABOT
-              </span>
-            </div>
-
-            {/* Mascota neutral oficial por encima */}
-            <div className="relative z-10">
+        {/* Columna Izquierda: Mascota y Presentación de Valor (Completamente Centrado) */}
+        <div className="flex-1 flex flex-col items-center text-center max-w-xl mx-auto lg:mx-0">
+          {/* Mascota neutral centrada ópticamente con aura */}
+          <div className="w-full flex justify-center mb-6">
+            <div className="relative translate-x-3 sm:translate-x-3.5">
               <div className="absolute -inset-6 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
               <motion.img
                 src="/syllabot_01_neutral.png"
@@ -134,31 +120,47 @@ export function LoginScreen() {
             </div>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mt-2">
+          {/* Título en grande Syllabot con resplandor cyan y barra de acento brillante */}
+          <div className="relative flex flex-col items-center justify-center">
+            {/* Halo de luz cyan difusa detrás del 'bot' */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-32 h-20 bg-cyan-400/25 blur-2xl rounded-full pointer-events-none" />
+
+            <h1 className="relative text-5xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-none flex items-center justify-center">
+              <span className="drop-shadow-[0_2px_15px_rgba(255,255,255,0.2)]">Sylla</span>
+              <span className="relative text-[#38bdf8] ml-1 drop-shadow-[0_0_25px_rgba(56,189,248,0.7)]">
+                bot
+              </span>
+            </h1>
+
+            {/* Barra de acento neón brillante bajo 'labot' con mayor separación */}
+            <div className="w-36 h-[3.5px] bg-gradient-to-r from-cyan-400 via-cyan-300 to-indigo-500 rounded-full shadow-[0_0_14px_rgba(56,189,248,0.85)] mt-4" />
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white/95 tracking-tight mt-5 text-center">
             Tu semestre bajo control
-          </h1>
-          <p className="text-indigo-200/70 text-sm sm:text-base mt-2.5 leading-relaxed max-w-lg">
+          </h2>
+          <p className="text-indigo-200/70 text-sm sm:text-base mt-2.5 leading-relaxed max-w-lg text-center mx-auto">
             Convierte el sílabo de tus cursos en un calendario organizado con inteligencia
             artificial. Nunca más te pierdas una práctica o un examen.
           </p>
 
-          {/* 3 Micro-pasos de Valor */}
+          {/* 3 Micro-pasos de Valor Centrados */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full mt-6">
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
               <span className="flex size-5 items-center justify-center rounded-md bg-indigo-600 text-white font-bold text-xs shrink-0">
                 1
               </span>
               <span className="text-xs font-medium text-white/90">Sube tu sílabo</span>
             </div>
 
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
               <span className="flex size-5 items-center justify-center rounded-md bg-indigo-600 text-white font-bold text-xs shrink-0">
                 2
               </span>
               <span className="text-xs font-medium text-white/90">La IA detecta fechas</span>
             </div>
 
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
               <span className="flex size-5 items-center justify-center rounded-md bg-indigo-600 text-white font-bold text-xs shrink-0">
                 3
               </span>
