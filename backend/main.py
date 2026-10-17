@@ -63,8 +63,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",
         "https://syllabot-red.vercel.app",
     ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,7 +101,11 @@ def build_ics(evaluaciones: list[dict]) -> bytes:
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    if file.content_type != "application/pdf":
+    is_pdf = (
+        file.content_type in ["application/pdf", "application/x-pdf", "application/octet-stream"]
+        or (file.filename and file.filename.lower().endswith(".pdf"))
+    )
+    if not is_pdf:
         raise HTTPException(status_code=400, detail="El archivo debe ser un PDF.")
 
     # 1. Extraer texto del PDF
