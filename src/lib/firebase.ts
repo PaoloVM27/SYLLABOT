@@ -15,5 +15,5 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const googleProvider = new GoogleAuthProvider();
-// Pedir permisos para leer y escribir eventos en Google Calendar
-googleProvider.addScope("https://www.googleapis.com/auth/calendar.events");
+// Solo solicitamos perfil y correo para un inicio de sesión seguro y sin advertencias
+
