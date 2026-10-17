@@ -16,4 +16,3 @@ export const auth = getAuth(app);
 
 export const googleProvider = new GoogleAuthProvider();
 // Solo solicitamos perfil y correo para un inicio de sesión seguro y sin advertencias
-

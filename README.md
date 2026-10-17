@@ -15,26 +15,28 @@ El ciclo de vida del procesamiento de datos en Syllabot consta de cuatro fases p
 
 ## Valor de Negocio y Escalabilidad
 
-*   **Optimización de Tiempos:** Automatiza un proceso manual iterativo, reduciendo el tiempo de estructuración de datos de horas a milisegundos por documento.
-*   **Mitigación de Errores:** Elimina la transcripción manual, garantizando la fidelidad de los datos temporales extraídos frente al documento original.
-*   **Baja Latencia:** Arquitectura optimizada (*stateless* en su fase inicial) para devolver el archivo procesado en un promedio de 2 a 5 segundos.
+- **Optimización de Tiempos:** Automatiza un proceso manual iterativo, reduciendo el tiempo de estructuración de datos de horas a milisegundos por documento.
+- **Mitigación de Errores:** Elimina la transcripción manual, garantizando la fidelidad de los datos temporales extraídos frente al documento original.
+- **Baja Latencia:** Arquitectura optimizada (_stateless_ en su fase inicial) para devolver el archivo procesado en un promedio de 2 a 5 segundos.
 
 ---
 
 ## Stack Tecnológico
 
 **Frontend (Client-Side)**
-*   **Core:** React, TypeScript[cite: 1]
-*   **Build Tool:** Vite (ESM-based)[cite: 1]
-*   **Estilos:** Tailwind CSS[cite: 1]
-*   **Gestor de Paquetes:** pnpm
+
+- **Core:** React, TypeScript[cite: 1]
+- **Build Tool:** Vite (ESM-based)[cite: 1]
+- **Estilos:** Tailwind CSS[cite: 1]
+- **Gestor de Paquetes:** pnpm
 
 **Backend (Server-Side / API)**
-*   **Core:** Python 3 (Framework: FastAPI)
-*   **Servidor ASGI:** Uvicorn
-*   **Procesamiento de Archivos:** pdfplumber, python-multipart
-*   **Integración IA:** google-generativeai (Gemini API)
-*   **Generación de Formatos:** ics
+
+- **Core:** Python 3 (Framework: FastAPI)
+- **Servidor ASGI:** Uvicorn
+- **Procesamiento de Archivos:** pdfplumber, python-multipart
+- **Integración IA:** google-generativeai (Gemini API)
+- **Generación de Formatos:** ics
 
 ---
 
@@ -43,6 +45,8 @@ El ciclo de vida del procesamiento de datos en Syllabot consta de cuatro fases p
 Las siguientes instrucciones detallan la configuración del entorno de desarrollo para el entorno cliente y servidor.
 
 ### 1. Clonación del Repositorio
+
 ```bash
 git clone <url-del-repositorio>
 cd syllabot
+```
