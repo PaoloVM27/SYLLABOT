@@ -99,7 +99,7 @@ export function LoginScreen() {
           alt="Syllabot Logo"
           className="size-8 object-contain drop-shadow-md"
         />
-        <span className="text-xl font-bold tracking-tight text-white">Syllabot</span>
+        <span className="text-xl font-bold font-space tracking-tight text-white">Syllabot</span>
       </header>
 
       {/* ── Contenedor Central: Dos Columnas (Referencia de Diseño) ── */}
@@ -108,24 +108,24 @@ export function LoginScreen() {
         <div className="flex-1 flex flex-col items-center text-center max-w-xl mx-auto lg:mx-0">
           {/* Mascota neutral centrada ópticamente con aura */}
           <div className="w-full flex justify-center mb-6">
-            <div className="relative translate-x-3 sm:translate-x-3.5">
-              <div className="absolute -inset-6 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative translate-x-5 sm:translate-x-6">
+              <div className="absolute -inset-7 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none" />
               <motion.img
                 src="/syllabot_01_neutral.png"
                 alt="Mascota Syllabot"
-                className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 object-contain drop-shadow-[0_20px_40px_rgba(99,102,241,0.35)]"
+                className="relative w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 object-contain drop-shadow-[0_25px_50px_rgba(99,102,241,0.4)]"
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               />
             </div>
           </div>
 
-          {/* Título en grande Syllabot con resplandor cyan y barra de acento brillante */}
+          {/* Título en grande Syllabot con tipografía Space Grotesk, resplandor cyan y barra de acento */}
           <div className="relative flex flex-col items-center justify-center">
             {/* Halo de luz cyan difusa detrás del 'bot' */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-32 h-20 bg-cyan-400/25 blur-2xl rounded-full pointer-events-none" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-48 h-28 bg-cyan-400/25 blur-3xl rounded-full pointer-events-none" />
 
-            <h1 className="relative text-5xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-none flex items-center justify-center">
+            <h1 className="relative font-space text-7xl sm:text-8xl lg:text-[6.5rem] font-bold tracking-tight text-white leading-none flex items-center justify-center">
               <span className="drop-shadow-[0_2px_15px_rgba(255,255,255,0.2)]">Sylla</span>
               <span className="relative text-[#38bdf8] ml-1 drop-shadow-[0_0_25px_rgba(56,189,248,0.7)]">
                 bot
@@ -133,10 +133,10 @@ export function LoginScreen() {
             </h1>
 
             {/* Barra de acento neón brillante bajo 'labot' con mayor separación */}
-            <div className="w-36 h-[3.5px] bg-gradient-to-r from-cyan-400 via-cyan-300 to-indigo-500 rounded-full shadow-[0_0_14px_rgba(56,189,248,0.85)] mt-4" />
+            <div className="w-48 sm:w-56 h-[4px] bg-gradient-to-r from-cyan-400 via-cyan-300 to-indigo-500 rounded-full shadow-[0_0_16px_rgba(56,189,248,0.9)] mt-7" />
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white/95 tracking-tight mt-5 text-center">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white/95 tracking-tight mt-6 text-center">
             Tu semestre bajo control
           </h2>
           <p className="text-indigo-200/70 text-sm sm:text-base mt-2.5 leading-relaxed max-w-lg text-center mx-auto">
