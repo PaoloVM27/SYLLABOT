@@ -93,37 +93,45 @@ export function LoginScreen() {
       <FloatingParticles />
 
       {/* ── Top Bar: Logo oficial en la esquina superior izquierda ── */}
-      <header className="relative z-20 flex items-center gap-3">
+      <header className="relative z-20 flex items-center gap-2.5">
         <img
           src="/SYLLABOT.png"
           alt="Syllabot Logo"
           className="size-8 object-contain drop-shadow-md"
         />
         <span className="text-xl font-bold tracking-tight text-white">Syllabot</span>
+        <span className="size-5 rounded-full bg-[#06b6d4]/20 text-[#22d3ee] border border-[#06b6d4]/40 text-[10px] font-bold flex items-center justify-center">
+          3
+        </span>
       </header>
 
       {/* ── Contenedor Central: Dos Columnas (Referencia de Diseño) ── */}
       <main className="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 py-8">
         {/* Columna Izquierda: Mascota y Presentación de Valor */}
         <div className="flex-1 flex flex-col items-center text-center lg:items-start lg:text-left max-w-xl">
-          {/* Mascota centrada con aura y tamaño aumentado */}
+          {/* Mascota centrada con aura */}
           <div className="w-full flex justify-center mb-6">
             <div className="relative">
               <div className="absolute -inset-6 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
               <motion.img
-                src="/syllabot_01_neutral.png"
+                src="/syllabot_02_saludando.png"
                 alt="Mascota Syllabot"
-                className="relative w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80 object-contain drop-shadow-[0_20px_40px_rgba(99,102,241,0.35)]"
+                className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 object-contain drop-shadow-[0_20px_40px_rgba(99,102,241,0.35)]"
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               />
             </div>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
-            Tu semestre bajo control
+          {/* Título en grande Syllabot con color sólido auténtico sin degradé */}
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-none">
+            Sylla<span className="text-[#38bdf8]">bot</span>
           </h1>
-          <p className="text-indigo-200/70 text-sm sm:text-base mt-3 leading-relaxed max-w-lg">
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white/95 tracking-tight mt-3">
+            Tu semestre bajo control
+          </h2>
+          <p className="text-indigo-200/70 text-sm sm:text-base mt-2.5 leading-relaxed max-w-lg">
             Convierte el sílabo de tus cursos en un calendario organizado con inteligencia
             artificial. Nunca más te pierdas una práctica o un examen.
           </p>
@@ -150,12 +158,6 @@ export function LoginScreen() {
               </span>
               <span className="text-xs font-medium text-white/90">Calendario listo</span>
             </div>
-          </div>
-
-          {/* Badge Informativo (sin redundancia de UNMSM) */}
-          <div className="mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
-            <span className="size-2 rounded-full bg-emerald-400" />
-            Sincronización instantánea con Google Calendar
           </div>
         </div>
 
