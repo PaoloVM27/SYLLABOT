@@ -109,12 +109,23 @@ export function LoginScreen() {
       <main className="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 py-8">
         {/* Columna Izquierda: Mascota y Presentación de Valor */}
         <div className="flex-1 flex flex-col items-center text-center lg:items-start lg:text-left max-w-xl">
-          {/* Mascota centrada con aura */}
-          <div className="w-full flex justify-center mb-6">
-            <div className="relative">
+          {/* Mascota con título SYLLABOT gigante semitransparente detrás */}
+          <div className="w-full flex justify-center mb-4 relative">
+            {/* Texto de marca gigante en capa trasera semitransparente */}
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+              aria-hidden="true"
+            >
+              <span className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-widest text-white/[0.08] uppercase whitespace-nowrap">
+                SYLLABOT
+              </span>
+            </div>
+
+            {/* Mascota neutral oficial por encima */}
+            <div className="relative z-10">
               <div className="absolute -inset-6 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
               <motion.img
-                src="/syllabot_02_saludando.png"
+                src="/syllabot_01_neutral.png"
                 alt="Mascota Syllabot"
                 className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 object-contain drop-shadow-[0_20px_40px_rgba(99,102,241,0.35)]"
                 animate={{ y: [0, -10, 0] }}
@@ -123,14 +134,9 @@ export function LoginScreen() {
             </div>
           </div>
 
-          {/* Título en grande Syllabot con color sólido auténtico sin degradé */}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-none">
-            Sylla<span className="text-[#38bdf8]">bot</span>
-          </h1>
-
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white/95 tracking-tight mt-3">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mt-2">
             Tu semestre bajo control
-          </h2>
+          </h1>
           <p className="text-indigo-200/70 text-sm sm:text-base mt-2.5 leading-relaxed max-w-lg">
             Convierte el sílabo de tus cursos en un calendario organizado con inteligencia
             artificial. Nunca más te pierdas una práctica o un examen.
