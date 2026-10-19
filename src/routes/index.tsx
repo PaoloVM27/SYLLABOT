@@ -16,6 +16,8 @@ import {
   ExternalLink,
   Sparkles,
   CheckCircle2,
+  ChevronDown,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { LoginScreen } from "@/auth/LoginScreen";
@@ -25,6 +27,14 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SettingsDialog } from "@/components/SettingsDialog";
 
 const locales = {
   es: es,
@@ -174,15 +184,15 @@ const MASCOT_CONFIG: Record<Phase, { src: string; message: string }> = {
 function MascotBubble({ phase }: { phase: Phase }) {
   const config = MASCOT_CONFIG[phase];
   return (
-    <div className="flex items-end gap-3.5 mb-6">
+    <div className="flex items-end gap-2.5 sm:gap-3.5 mb-6 justify-start">
       <div className="relative shrink-0">
         <img
           src={config.src}
           alt="Syllabot mascota"
-          className="w-20 h-20 object-contain drop-shadow-md"
+          className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md"
         />
       </div>
-      <div className="relative bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 max-w-xs shadow-sm">
+      <div className="relative bg-card border border-border rounded-2xl rounded-bl-sm px-3.5 py-2.5 sm:px-4 sm:py-3 max-w-[240px] sm:max-w-xs shadow-sm">
         <p className="text-xs sm:text-sm font-medium text-foreground leading-relaxed">
           {config.message}
         </p>
@@ -192,13 +202,13 @@ function MascotBubble({ phase }: { phase: Phase }) {
   );
 }
 
-/* ── Stepper de Progreso ── */
+/* ── Stepper de Progreso Adaptable a Móvil y Desktop ── */
 function FlowStepper({ phase }: { phase: Phase }) {
   const steps = [
-    { key: "upload", label: "1. Subir Sílabo" },
-    { key: "analyze", label: "2. Procesar IA" },
-    { key: "review", label: "3. Revisar Eventos" },
-    { key: "export", label: "4. Exportar" },
+    { key: "upload", label: "1. Subir Sílabo", short: "1. Subir" },
+    { key: "analyze", label: "2. Procesar IA", short: "2. IA" },
+    { key: "review", label: "3. Revisar Eventos", short: "3. Revisar" },
+    { key: "export", label: "4. Exportar", short: "4. Exportar" },
   ];
 
   let currentIdx = 0;
@@ -206,15 +216,15 @@ function FlowStepper({ phase }: { phase: Phase }) {
   else if (phase === "success") currentIdx = 2;
 
   return (
-    <div className="w-full bg-muted/40 border border-border/80 rounded-2xl p-2.5 mb-8">
-      <div className="grid grid-cols-4 gap-2 text-center">
+    <div className="w-full bg-muted/40 border border-border/80 rounded-2xl p-1.5 sm:p-2.5 mb-6 sm:mb-8">
+      <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center">
         {steps.map((st, i) => {
           const isDone = i < currentIdx;
           const isCurrent = i === currentIdx;
           return (
             <div
               key={st.key}
-              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-2 rounded-xl text-[10px] sm:text-xs font-semibold transition-all ${
                 isCurrent
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : isDone
@@ -222,8 +232,9 @@ function FlowStepper({ phase }: { phase: Phase }) {
                     : "text-muted-foreground/60"
               }`}
             >
-              {isDone && <Check size={12} className="stroke-[3]" />}
-              <span className="truncate">{st.label}</span>
+              {isDone && <Check size={11} className="stroke-[3] shrink-0" />}
+              <span className="hidden sm:inline truncate">{st.label}</span>
+              <span className="sm:hidden truncate">{st.short}</span>
             </div>
           );
         })}
@@ -239,6 +250,277 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/* ── Helpers para usuario ── */
+function getGoogleDefaultLetter(name?: string | null, email?: string | null): string {
+  if (name && name.trim()) return name.trim().charAt(0).toUpperCase();
+  if (email && email.trim()) return email.trim().charAt(0).toUpperCase();
+  return "U";
+}
+
+function getGoogleAvatarColor(letter: string): string {
+  const colors: Record<string, string> = {
+    A: "bg-[#795548]",
+    B: "bg-[#e91e63]",
+    C: "bg-[#9c27b0]",
+    D: "bg-[#673ab7]",
+    E: "bg-[#3f51b5]",
+    F: "bg-[#2196f3]",
+    G: "bg-[#03a9f4]",
+    H: "bg-[#00bcd4]",
+    I: "bg-[#009688]",
+    J: "bg-[#4caf50]",
+    K: "bg-[#8bc34a]",
+    L: "bg-[#cddc39]",
+    M: "bg-[#ffeb3b] text-black",
+    N: "bg-[#ffc107] text-black",
+    O: "bg-[#ff9800]",
+    P: "bg-[#2e7d32]",
+    Q: "bg-[#f44336]",
+    R: "bg-[#00897b]",
+    S: "bg-[#d81b60]",
+    T: "bg-[#8e24aa]",
+    U: "bg-[#5e35b1]",
+    V: "bg-[#3949ab]",
+    W: "bg-[#1e88e5]",
+    X: "bg-[#039be5]",
+    Y: "bg-[#00acc1]",
+    Z: "bg-[#00897b]",
+  };
+  return colors[letter.toUpperCase()] || "bg-[#2e7d32]";
+}
+
+function formatUserName(name?: string | null): string {
+  if (!name) return "Estudiante";
+  if (name === name.toUpperCase()) {
+    return name
+      .toLowerCase()
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+  return name;
+}
+
+/* ── Reglas Estrictas de Evaluaciones (UNMSM / Universidad) ── */
+interface RawEval {
+  nombre?: string;
+  fecha?: string;
+  peso?: number;
+  semana?: number;
+}
+
+interface NormalizedEval {
+  nombre: string;
+  fecha: string;
+  peso: number;
+  semana: number;
+}
+
+function sanitizeEvaluacionesFrontend(rawList: RawEval[]): RawEval[] {
+  if (!rawList || rawList.length === 0) return [];
+
+  const cleaned: NormalizedEval[] = [];
+  for (const e of rawList) {
+    const nombre = (e.nombre || "").trim();
+    if (nombre.length > 0) {
+      cleaned.push({
+        nombre,
+        fecha: e.fecha || "0000-00-00",
+        peso: typeof e.peso === "number" ? e.peso : 0,
+        semana: typeof e.semana === "number" ? e.semana : 0,
+      });
+    }
+  }
+
+  const parcialCandidates: NormalizedEval[] = [];
+  const finalCandidates: NormalizedEval[] = [];
+  const practicaCandidates: NormalizedEval[] = [];
+  const proyectoCandidates: NormalizedEval[] = [];
+  const otrosCandidates: NormalizedEval[] = [];
+
+  for (const ev of cleaned) {
+    const n = ev.nombre.toLowerCase();
+    const isProyecto = /\b(proyecto|avance|entregable|sustentaci[oó]n|informe)\b/i.test(n);
+    const isPractica = /(pr[aá]ctica\s+calificad[ao]|\bpc\b|\bpc\s*\d|\bpr[aá]ctica\s*\d)/i.test(n);
+    const isParcial = /\b(parcial|ep)\b/i.test(n) && !isProyecto;
+    const isFinal = /\b(final|ef)\b/i.test(n) && !isProyecto && !isParcial;
+
+    if (isParcial) {
+      parcialCandidates.push(ev);
+    } else if (isFinal) {
+      finalCandidates.push(ev);
+    } else if (isPractica) {
+      practicaCandidates.push(ev);
+    } else if (isProyecto) {
+      proyectoCandidates.push(ev);
+    } else {
+      otrosCandidates.push(ev);
+    }
+  }
+
+  const result: NormalizedEval[] = [];
+
+  // 1. Regla: Máximo 1 Examen Parcial (cercano a semana 8)
+  if (parcialCandidates.length > 0) {
+    const firstParcial = parcialCandidates[0];
+    if (firstParcial) {
+      let bestParcial = firstParcial;
+      for (const curr of parcialCandidates) {
+        const prevDiff = bestParcial.semana > 0 ? Math.abs(bestParcial.semana - 8) : 99;
+        const currDiff = curr.semana > 0 ? Math.abs(curr.semana - 8) : 99;
+        if (currDiff < prevDiff) {
+          bestParcial = curr;
+        }
+      }
+      result.push({ ...bestParcial, nombre: "Examen Parcial" });
+    }
+  }
+
+  // 2. Regla: Máximo 1 Examen Final (nunca en semana 8 ni misma fecha que parcial)
+  if (finalCandidates.length > 0) {
+    const validFinals = finalCandidates.filter((f) => {
+      if (
+        result.some(
+          (r) => r.nombre === "Examen Parcial" && r.fecha === f.fecha && f.fecha !== "0000-00-00",
+        )
+      ) {
+        return false;
+      }
+      if (f.semana > 0 && f.semana <= 8) return false;
+      return true;
+    });
+
+    const pool =
+      validFinals.length > 0
+        ? validFinals
+        : !result.some((r) => r.nombre === "Examen Parcial")
+          ? finalCandidates
+          : [];
+
+    if (pool.length > 0) {
+      const firstFinal = pool[0];
+      if (firstFinal) {
+        let bestFinal = firstFinal;
+        for (const curr of pool) {
+          if (curr.semana > bestFinal.semana || curr.fecha > bestFinal.fecha) {
+            bestFinal = curr;
+          }
+        }
+        result.push({ ...bestFinal, nombre: "Examen Final" });
+      }
+    }
+  }
+
+  // 3. Regla: Prácticas Calificadas (Máximo 2 o menos)
+  if (practicaCandidates.length > 0) {
+    practicaCandidates.sort((a, b) => {
+      if (a.semana !== b.semana) return a.semana - b.semana;
+      return a.fecha.localeCompare(b.fecha);
+    });
+    const uniquePcs: NormalizedEval[] = [];
+    const seenPcs = new Set<string>();
+    for (const pc of practicaCandidates) {
+      const key = `${pc.semana}-${pc.fecha}`;
+      if (!seenPcs.has(key) || key === "0-0000-00-00") {
+        uniquePcs.push(pc);
+        if (key !== "0-0000-00-00") seenPcs.add(key);
+      }
+    }
+    const selectedPcs = uniquePcs.slice(0, 2);
+    for (let i = 0; i < selectedPcs.length; i++) {
+      const pc = selectedPcs[i];
+      if (pc) {
+        result.push({
+          ...pc,
+          nombre: `Práctica Calificada ${i + 1}`,
+        });
+      }
+    }
+  }
+
+  // 4. Regla: Proyectos y Entregables (semana 15 es Presentación de Proyecto Final)
+  if (proyectoCandidates.length > 0) {
+    proyectoCandidates.sort((a, b) => {
+      if (a.semana !== b.semana) return a.semana - b.semana;
+      return a.fecha.localeCompare(b.fecha);
+    });
+
+    let uniqueProjs: NormalizedEval[] = [];
+    const seenProj = new Set<string>();
+    for (const pr of proyectoCandidates) {
+      const key = `${pr.semana}-${pr.fecha}`;
+      if (!seenProj.has(key) || key === "0-0000-00-00") {
+        uniqueProjs.push(pr);
+        if (key !== "0-0000-00-00") seenProj.add(key);
+      }
+    }
+
+    if (uniqueProjs.some((p) => p.semana === 15) && uniqueProjs.some((p) => p.semana === 16)) {
+      uniqueProjs = uniqueProjs.filter((p) => p.semana !== 16);
+    }
+
+    const ordinals: Record<number, string> = {
+      1: "1er",
+      2: "2do",
+      3: "3er",
+      4: "4to",
+      5: "5to",
+      6: "6to",
+      7: "7mo",
+      8: "8vo",
+    };
+
+    if (uniqueProjs.length === 1) {
+      const p = uniqueProjs[0];
+      if (p) {
+        const isFinal = p.semana >= 14 || p.semana === 0;
+        result.push({
+          ...p,
+          nombre: isFinal ? "Presentación de Proyecto Final" : "1er Entregable de Proyecto",
+        });
+      }
+    } else if (uniqueProjs.length > 1) {
+      let finalIdx = uniqueProjs.findIndex((p) => p.semana === 15);
+      const lastProj = uniqueProjs[uniqueProjs.length - 1];
+      if (finalIdx === -1 && lastProj && lastProj.semana >= 14) {
+        finalIdx = uniqueProjs.length - 1;
+      }
+
+      let entregableCount = 1;
+      for (let idx = 0; idx < uniqueProjs.length; idx++) {
+        const p = uniqueProjs[idx];
+        if (!p) continue;
+        if (idx === finalIdx) {
+          result.push({ ...p, nombre: "Presentación de Proyecto Final" });
+        } else {
+          const ordStr = ordinals[entregableCount] ?? `${entregableCount}°`;
+          result.push({ ...p, nombre: `${ordStr} Entregable de Proyecto` });
+          entregableCount++;
+        }
+      }
+    }
+  }
+
+  // 5. Otros Hitos
+  for (const ot of otrosCandidates) {
+    if (!result.some((r) => r.nombre === ot.nombre && r.fecha === ot.fecha)) {
+      result.push(ot);
+    }
+  }
+
+  result.sort((a, b) => {
+    if (a.semana > 0 && b.semana > 0 && a.semana !== b.semana) {
+      return a.semana - b.semana;
+    }
+    if (a.fecha !== "0000-00-00" && b.fecha !== "0000-00-00") {
+      return a.fecha.localeCompare(b.fecha);
+    }
+    return 0;
+  });
+
+  return result;
+}
+
 function Index() {
   const { user, loading, logout } = useAuth();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -251,11 +533,27 @@ function Index() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventCategory, setNewEventCategory] = useState<EventCategory>("practica");
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogout = async () => {
+    try {
+      setEvents([]);
+      setSelectedFile(null);
+      setFileName("");
+      setPhase("idle");
+      setErrorMessage("");
+      await logout();
+      toast.success("Has cerrado sesión exitosamente");
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
+      toast.error("Ocurrió un error al cerrar sesión");
+    }
+  };
 
   const acceptFile = useCallback((file: File) => {
     const validExtensions = [".pdf", ".doc", ".docx"];
@@ -320,12 +618,7 @@ function Index() {
       const data = await res.json();
 
       let minDate = new Date();
-      interface RawEval {
-        nombre?: string;
-        fecha?: string;
-        peso?: number;
-      }
-      const rawEvaluaciones: RawEval[] = data.evaluaciones || [];
+      const rawEvaluaciones: RawEval[] = sanitizeEvaluacionesFrontend(data.evaluaciones || []);
       const exactDates = rawEvaluaciones.filter(
         (e): e is RawEval & { fecha: string } =>
           Boolean(e.fecha) && e.fecha !== "0000-00-00" && !e.fecha!.includes("0000"),
@@ -342,47 +635,40 @@ function Index() {
       vagueDate.setDate(vagueDate.getDate() - 1);
       vagueDate.setHours(0, 0, 0, 0);
 
-      const parsedEvents: SyllabotEvent[] = (data.evaluaciones || []).map(
-        (
-          ev: {
-            nombre: string;
-            fecha: string;
-            peso?: number;
-          },
-          index: number,
-        ) => {
-          const hasExactDate =
-            Boolean(ev.fecha) && ev.fecha !== "0000-00-00" && !ev.fecha.includes("0000");
+      const parsedEvents: SyllabotEvent[] = rawEvaluaciones.map((ev: RawEval, index: number) => {
+        const hasExactDate =
+          Boolean(ev.fecha) && ev.fecha !== "0000-00-00" && !ev.fecha!.includes("0000");
 
-          let startDate: Date;
-          if (hasExactDate) {
-            startDate = new Date(ev.fecha.replace(/\//g, "-") + "T10:00:00");
-          } else {
-            startDate = new Date(vagueDate);
-            startDate.setHours(10, 0, 0, 0);
-          }
+        let startDate: Date;
+        if (hasExactDate) {
+          startDate = new Date(ev.fecha!.replace(/\//g, "-") + "T10:00:00");
+        } else {
+          startDate = new Date(vagueDate);
+          startDate.setHours(10, 0, 0, 0);
+        }
 
-          const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-          const dateWarning = hasExactDate ? "" : " ⚠️";
+        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+        const dateWarning = hasExactDate ? "" : " ⚠️";
+        const title = (ev.nombre || "Evaluación").trim();
 
-          return {
-            id: `ev-${index}-${Date.now()}`,
-            title: ev.nombre + dateWarning,
-            tooltip: `${ev.nombre}${ev.peso ? ` (${ev.peso}%)` : ""}${
-              hasExactDate ? "" : " (Fecha sin especificar)"
-            }`,
-            start: isNaN(startDate.getTime()) ? new Date() : startDate,
-            end: isNaN(endDate.getTime()) ? new Date() : endDate,
-            description: `Peso de la evaluación: ${ev.peso || "No especificado"}%`,
-            peso: ev.peso,
-            category: categorizeEvent(ev.nombre),
-            selected: true,
-            hasExactDate: hasExactDate,
-            isVagueDate: !hasExactDate,
-            vagueDateRef: vagueDate.getTime(),
-          };
-        },
-      );
+        const eventItem: SyllabotEvent = {
+          id: `ev-${index}-${Date.now()}`,
+          title: title + dateWarning,
+          tooltip: `${title}${typeof ev.peso === "number" && ev.peso > 0 ? ` (${ev.peso}%)` : ""}${
+            hasExactDate ? "" : " (Fecha sin especificar)"
+          }`,
+          start: isNaN(startDate.getTime()) ? new Date() : startDate,
+          end: isNaN(endDate.getTime()) ? new Date() : endDate,
+          description: `Peso de la evaluación: ${typeof ev.peso === "number" ? ev.peso : "No especificado"}%`,
+          category: categorizeEvent(title),
+          selected: true,
+          hasExactDate: hasExactDate,
+          isVagueDate: !hasExactDate,
+          vagueDateRef: vagueDate.getTime(),
+          ...(typeof ev.peso === "number" ? { peso: ev.peso } : {}),
+        };
+        return eventItem;
+      });
 
       setEvents(parsedEvents);
       setCurrentDate(vagueDate);
@@ -581,41 +867,123 @@ function Index() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans antialiased overflow-x-hidden">
-      {/* ── Header ── */}
-      <header className="border-b border-border/60 bg-card/70 backdrop-blur-md sticky top-0 z-50">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-6">
-          <a href="/" className="flex items-center gap-3">
-            <img src="/SYLLABOT.png" alt="Syllabot" className="size-10 object-contain" />
-            <span className="text-xl font-bold tracking-tight text-foreground">Syllabot</span>
+      {/* ── Header con tono índigo más claro y luminoso ── */}
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#202758] via-[#2d3775] to-[#202758] border-b border-indigo-400/25 shadow-lg shadow-indigo-950/15 relative overflow-hidden">
+        {/* Gradientes de luz sutiles que aportan claridad y profundidad */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(129,140,248,0.35)_0%,_transparent_65%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(99,102,241,0.25)_0%,_transparent_65%)] pointer-events-none" />
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-indigo-400 via-sky-400 to-indigo-500 pointer-events-none" />
+
+        <div className="relative z-10 mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
+          <a
+            href="/"
+            className="flex items-center gap-2.5 sm:gap-3 group transition-transform active:scale-95 shrink-0"
+          >
+            <img
+              src="/SYLLABOT.png"
+              alt="Syllabot Logo"
+              className="size-8 sm:size-9 object-contain drop-shadow-md transition-transform group-hover:scale-105"
+            />
+            <span className="text-lg sm:text-xl font-bold font-space tracking-tight text-white drop-shadow-sm">
+              Syllabot
+            </span>
           </a>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-sm font-semibold text-foreground">
-                {user?.displayName || "Estudiante"}
-              </span>
-              <span className="text-xs text-muted-foreground">{user?.email}</span>
-            </div>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
-              title="Cerrar sesión"
-            >
-              <LogOut size={14} />
-              <span className="hidden sm:inline">Salir</span>
-            </button>
+          {/* Menú desplegable del Usuario adaptable */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="group flex items-center gap-2 sm:gap-3 py-1 px-2 sm:py-1.5 sm:px-3 rounded-full sm:rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 hover:border-indigo-300/40 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 cursor-pointer text-left shadow-sm"
+                >
+                  {user?.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user?.displayName || "Usuario"}
+                      referrerPolicy="no-referrer"
+                      className="size-8 sm:size-9 rounded-full object-cover border border-indigo-300/40 shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className={`size-8 sm:size-9 rounded-full ${getGoogleAvatarColor(
+                        getGoogleDefaultLetter(user?.displayName, user?.email),
+                      )} text-white flex items-center justify-center text-xs sm:text-sm font-semibold border border-indigo-300/40 shadow-sm shrink-0`}
+                    >
+                      {getGoogleDefaultLetter(user?.displayName, user?.email)}
+                    </div>
+                  )}
+
+                  <div className="hidden sm:flex flex-col min-w-0 pr-1 text-left">
+                    <span className="text-xs sm:text-sm font-semibold text-white truncate max-w-[130px] md:max-w-[200px] lg:max-w-[240px] leading-tight">
+                      {formatUserName(user?.displayName) || "Estudiante"}
+                    </span>
+                    <span className="text-[11px] text-indigo-100/80 truncate max-w-[130px] md:max-w-[200px] lg:max-w-[240px] leading-tight">
+                      {user?.email}
+                    </span>
+                  </div>
+
+                  <ChevronDown className="size-3.5 text-indigo-100/70 group-hover:text-white transition-transform duration-200 shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent
+                align="end"
+                sideOffset={8}
+                className="w-[calc(100vw-2rem)] sm:w-80 max-w-sm p-2.5 bg-[#1b224c]/95 border border-indigo-400/30 text-white shadow-2xl rounded-2xl backdrop-blur-2xl z-50"
+              >
+                {/* Cabecera del usuario en el desplegable (sin círculo) */}
+                <div className="p-3 rounded-xl bg-white/[0.08] border border-white/10 mb-1.5">
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-sm font-semibold text-white truncate leading-snug">
+                      {formatUserName(user?.displayName) || "Estudiante"}
+                    </p>
+                    <p className="text-xs text-indigo-100/80 truncate leading-snug mt-0.5">
+                      {user?.email}
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-300 font-medium mt-1.5">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Cuenta UNMSM activa
+                    </span>
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator className="bg-white/10 my-1" />
+
+                <DropdownMenuItem
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-100 hover:text-white focus:bg-white/[0.12] focus:text-white rounded-lg cursor-pointer transition-colors"
+                >
+                  <Settings className="size-4 text-indigo-300" />
+                  <span>Configuración</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="bg-white/10 my-1" />
+
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-300 hover:text-rose-200 focus:bg-rose-500/20 focus:text-rose-200 rounded-lg cursor-pointer transition-colors"
+                >
+                  <LogOut className="size-4" />
+                  <span>Cerrar sesión</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
 
-      {/* ── Main Two-Column Layout ── */}
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col lg:flex-row gap-10 px-6 pb-20 pt-8 lg:pt-10">
+      {/* Modal de Configuración */}
+      <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} user={user} />
+
+      {/* ── Main Two-Column Layout Adaptable a Móvil, Tablet y Desktop ── */}
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col lg:flex-row gap-8 lg:gap-10 px-4 sm:px-6 pb-16 sm:pb-20 pt-6 sm:pt-8 lg:pt-10">
         {/* Left Column: Upload & Review */}
-        <div className="flex-1 flex flex-col items-start text-left w-full max-w-[520px] mx-auto lg:max-w-none">
-          <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl mb-3 text-center lg:text-left">
+        <div className="flex-1 flex flex-col items-start text-left w-full max-w-2xl lg:max-w-none mx-auto lg:mx-0">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight tracking-tight text-foreground mb-3 text-center lg:text-left w-full lg:w-auto">
             Tu semestre organizado en segundos.
           </h1>
-          <p className="text-muted-foreground text-base mb-6 text-center lg:text-left">
+          <p className="text-muted-foreground text-sm sm:text-base mb-6 text-center lg:text-left w-full lg:w-auto">
             Sube tu sílabo y nuestra IA extraerá todas las fechas de evaluaciones para que puedas
             revisarlas y exportarlas a tu Google Calendar.
           </p>
@@ -938,10 +1306,10 @@ function Index() {
           </div>
         </div>
 
-        {/* ── Right Column: Calendar Preview ── */}
-        <div className="flex-[1.5] flex flex-col bg-card border border-border rounded-2xl shadow-sm overflow-hidden h-[620px] lg:h-[720px] w-full">
+        {/* ── Right Column: Calendar Preview Adaptable ── */}
+        <div className="flex-[1.5] flex flex-col bg-card border border-border rounded-2xl shadow-sm overflow-hidden min-h-[500px] h-[580px] sm:h-[640px] lg:h-[720px] w-full">
           {/* Calendar Header */}
-          <div className="px-6 py-3.5 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="p-4 sm:px-6 sm:py-3.5 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
             <div>
               <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
                 <CalendarIcon className="text-primary" size={18} /> Vista Previa del Semestre
@@ -957,7 +1325,7 @@ function Index() {
             <button
               onClick={handleExportICS}
               disabled={activeEventsCount === 0}
-              className="flex items-center gap-2 bg-[#4285F4] text-white px-4 py-2 rounded-xl text-xs font-bold transition-all hover:bg-[#3367d6] hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0"
+              className="flex items-center justify-center gap-2 bg-[#4285F4] text-white px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all hover:bg-[#3367d6] hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 w-full sm:w-auto"
               title="Descargar archivo de calendario .ics para Google Calendar"
             >
               <Download size={15} />
@@ -967,7 +1335,7 @@ function Index() {
 
           {/* Leyenda de Colores */}
           {events.length > 0 && (
-            <div className="px-6 py-2 bg-muted/30 border-b border-border/60 flex items-center gap-4 flex-wrap text-[11px]">
+            <div className="px-4 sm:px-6 py-2.5 bg-muted/30 border-b border-border/60 flex items-center gap-2.5 sm:gap-4 flex-wrap text-[11px]">
               <span className="font-semibold text-muted-foreground">Leyenda:</span>
               <span className="flex items-center gap-1.5 font-medium">
                 <span className="size-2 rounded-full bg-rose-500" /> Exámenes

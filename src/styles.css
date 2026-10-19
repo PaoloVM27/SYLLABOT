@@ -149,5 +149,83 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    overflow-x: hidden;
+  }
+}
+
+/* ── Sonner Toaster: Posición bajo el header y efecto de desvanecimiento suave ── */
+[data-sonner-toaster][data-y-position="top"] {
+  top: 84px !important;
+}
+
+@media (max-width: 640px) {
+  [data-sonner-toaster][data-y-position="top"] {
+    top: 76px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: calc(100vw - 24px) !important;
+  }
+}
+
+[data-sonner-toast] {
+  transition:
+    opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease !important;
+}
+
+[data-sonner-toast][data-mounted="true"] {
+  animation: toastFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+[data-sonner-toast][data-removed="true"] {
+  opacity: 0 !important;
+  transform: translateY(-8px) scale(0.96) !important;
+  transition:
+    opacity 0.45s ease-out,
+    transform 0.45s ease-out !important;
+}
+
+@keyframes toastFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Estilos responsivos de react-big-calendar en móviles y tablets ── */
+@media (max-width: 640px) {
+  .rbc-toolbar {
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: stretch !important;
+  }
+  .rbc-toolbar .rbc-btn-group {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+  .rbc-toolbar button {
+    flex: 1 !important;
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+  .rbc-toolbar-label {
+    text-align: center !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    padding: 2px 0 !important;
+  }
+  .rbc-header {
+    font-size: 11px !important;
+    padding: 4px 1px !important;
+  }
+  .rbc-event {
+    font-size: 10px !important;
+    padding: 1px 3px !important;
   }
 }

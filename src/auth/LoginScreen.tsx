@@ -84,7 +84,7 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden bg-[#07091a]">
+    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-6 lg:p-10 relative overflow-hidden bg-[#07091a]">
       {/* Fondos con gradientes sutiles */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(67,56,202,0.45)_0%,_transparent_60%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(99,102,241,0.15)_0%,_transparent_60%)] pointer-events-none" />
@@ -93,27 +93,29 @@ export function LoginScreen() {
       <FloatingParticles />
 
       {/* ── Top Bar: Logo oficial en la esquina superior izquierda ── */}
-      <header className="relative z-20 flex items-center gap-3">
+      <header className="relative z-20 flex items-center gap-2.5 sm:gap-3">
         <img
           src="/SYLLABOT.png"
           alt="Syllabot Logo"
-          className="size-8 object-contain drop-shadow-md"
+          className="size-7 sm:size-8 object-contain drop-shadow-md"
         />
-        <span className="text-xl font-bold font-space tracking-tight text-white">Syllabot</span>
+        <span className="text-lg sm:text-xl font-bold font-space tracking-tight text-white">
+          Syllabot
+        </span>
       </header>
 
-      {/* ── Contenedor Central: Dos Columnas (Referencia de Diseño) ── */}
-      <main className="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16 py-8">
+      {/* ── Contenedor Central: Dos Columnas Adaptable a Cualquier Pantalla ── */}
+      <main className="relative z-10 w-full max-w-6xl mx-auto my-auto flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 lg:gap-16 py-6 sm:py-8">
         {/* Columna Izquierda: Mascota y Presentación de Valor (Completamente Centrado) */}
-        <div className="flex-1 flex flex-col items-center text-center max-w-xl mx-auto lg:mx-0">
+        <div className="flex-1 flex flex-col items-center text-center max-w-xl mx-auto lg:mx-0 w-full">
           {/* Mascota neutral centrada ópticamente con aura */}
-          <div className="w-full flex justify-center mb-6">
-            <div className="relative translate-x-5 sm:translate-x-6">
+          <div className="w-full flex justify-center mb-4 sm:mb-6">
+            <div className="relative translate-x-3 sm:translate-x-6">
               <div className="absolute -inset-7 bg-indigo-500/25 rounded-full blur-3xl pointer-events-none" />
               <motion.img
                 src="/syllabot_01_neutral.png"
                 alt="Mascota Syllabot"
-                className="relative w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 object-contain drop-shadow-[0_25px_50px_rgba(99,102,241,0.4)]"
+                className="relative w-44 h-44 sm:w-64 sm:h-64 lg:w-80 lg:h-80 object-contain drop-shadow-[0_25px_50px_rgba(99,102,241,0.4)]"
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               />
@@ -123,9 +125,9 @@ export function LoginScreen() {
           {/* Título en grande Syllabot con tipografía Space Grotesk, resplandor cyan y barra de acento */}
           <div className="relative flex flex-col items-center justify-center">
             {/* Halo de luz cyan difusa detrás del 'bot' */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-48 h-28 bg-cyan-400/25 blur-3xl rounded-full pointer-events-none" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-36 sm:w-48 h-24 sm:h-28 bg-cyan-400/25 blur-3xl rounded-full pointer-events-none" />
 
-            <h1 className="relative font-space text-7xl sm:text-8xl lg:text-[6.5rem] font-bold tracking-tight text-white leading-none flex items-center justify-center">
+            <h1 className="relative font-space text-5xl sm:text-7xl lg:text-[6.5rem] font-bold tracking-tight text-white leading-none flex items-center justify-center">
               <span className="drop-shadow-[0_2px_15px_rgba(255,255,255,0.2)]">Sylla</span>
               <span className="relative text-[#38bdf8] ml-1 drop-shadow-[0_0_25px_rgba(56,189,248,0.7)]">
                 bot
@@ -133,34 +135,34 @@ export function LoginScreen() {
             </h1>
 
             {/* Barra de acento neón brillante bajo 'labot' con mayor separación */}
-            <div className="w-48 sm:w-56 h-[4px] bg-gradient-to-r from-cyan-400 via-cyan-300 to-indigo-500 rounded-full shadow-[0_0_16px_rgba(56,189,248,0.9)] mt-7" />
+            <div className="w-36 sm:w-56 h-[4px] bg-gradient-to-r from-cyan-400 via-cyan-300 to-indigo-500 rounded-full shadow-[0_0_16px_rgba(56,189,248,0.9)] mt-5 sm:mt-7" />
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white/95 tracking-tight mt-6 text-center">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white/95 tracking-tight mt-5 sm:mt-6 text-center">
             Tu semestre bajo control
           </h2>
-          <p className="text-indigo-200/70 text-sm sm:text-base mt-2.5 leading-relaxed max-w-lg text-center mx-auto">
+          <p className="text-indigo-200/70 text-xs sm:text-sm lg:text-base mt-2.5 leading-relaxed max-w-lg text-center mx-auto px-2">
             Convierte el sílabo de tus cursos en un calendario organizado con inteligencia
             artificial. Nunca más te pierdas una práctica o un examen.
           </p>
 
           {/* 3 Micro-pasos de Valor Centrados */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full mt-6">
-            <div className="flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5 w-full mt-5 sm:mt-6">
+            <div className="flex items-center justify-center gap-2.5 px-3 py-2 sm:py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
               <span className="flex size-5 items-center justify-center rounded-md bg-indigo-600 text-white font-bold text-xs shrink-0">
                 1
               </span>
               <span className="text-xs font-medium text-white/90">Sube tu sílabo</span>
             </div>
 
-            <div className="flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2.5 px-3 py-2 sm:py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
               <span className="flex size-5 items-center justify-center rounded-md bg-indigo-600 text-white font-bold text-xs shrink-0">
                 2
               </span>
               <span className="text-xs font-medium text-white/90">La IA detecta fechas</span>
             </div>
 
-            <div className="flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2.5 px-3 py-2 sm:py-2.5 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm">
               <span className="flex size-5 items-center justify-center rounded-md bg-indigo-600 text-white font-bold text-xs shrink-0">
                 3
               </span>
@@ -173,7 +175,7 @@ export function LoginScreen() {
         <div className="w-full max-w-[460px]">
           <motion.div
             layout
-            className="bg-[#141838]/90 backdrop-blur-2xl border border-indigo-400/25 rounded-[2.2rem] p-8 sm:p-10 shadow-[0_25px_60px_rgba(0,0,0,0.65),_0_0_40px_rgba(99,102,241,0.15)] relative overflow-hidden"
+            className="bg-[#141838]/90 backdrop-blur-2xl border border-indigo-400/25 rounded-2xl sm:rounded-[2.2rem] p-6 sm:p-10 shadow-[0_25px_60px_rgba(0,0,0,0.65),_0_0_40px_rgba(99,102,241,0.15)] relative overflow-hidden"
           >
             <ScanningLine />
 
@@ -184,10 +186,10 @@ export function LoginScreen() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
-                  className="space-y-6 relative z-10"
+                  className="space-y-5 sm:space-y-6 relative z-10"
                 >
                   <div>
-                    <h2 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+                    <h2 className="text-white text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
                       Iniciar sesión
                     </h2>
                     <p className="text-white/60 text-xs sm:text-sm mt-1.5">
@@ -198,7 +200,7 @@ export function LoginScreen() {
                   {/* Botón Blanco Oficial de Google */}
                   <button
                     onClick={handleGoogle}
-                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-bold py-4 px-5 rounded-2xl shadow-md hover:bg-gray-100 active:scale-[0.99] transition-all text-base cursor-pointer"
+                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-bold py-3.5 sm:py-4 px-4 sm:px-5 rounded-xl sm:rounded-2xl shadow-md hover:bg-gray-100 active:scale-[0.99] transition-all text-sm sm:text-base cursor-pointer"
                   >
                     <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0">
                       <path

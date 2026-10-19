@@ -34,6 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = async () => {
+    try {
+      sessionStorage.removeItem("googleCalendarToken");
+      sessionStorage.clear();
+    } catch (e) {
+      console.error("Error clearing session storage:", e);
+    }
     await signOut(auth);
     setUser(null);
   };

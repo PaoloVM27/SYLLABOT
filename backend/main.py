@@ -34,20 +34,40 @@ class EvaluacionesResponse(typing.TypedDict):
 
 
 PROMPT_TEMPLATE = """
-Eres un asistente que extrae datos de sílabos universitarios.
+Eres un asistente experto que extrae con máxima precisión datos y cronogramas de sílabos universitarios (como UNMSM).
 
 Extrae la siguiente información global del curso:
 - fecha_inicio: Fecha de inicio de clases en formato YYYY-MM-DD (busca en los datos generales, ej. 24/08/2026 -> 2026-08-24). Si no la hay, usa "0000-00-00".
 - dia_clases: El día principal de la semana en el que se dicta la clase (ej. "Martes"). Usa solo una palabra en español, sin tildes. Si no hay, usa "".
 
-Luego, extrae ÚNICAMENTE las evaluaciones principales e hitos importantes del curso:
-- SÍ DEBES EXTRAER: "Práctica calificada" (PC), "Examen Parcial", "Examen Final", "Avance de proyecto", "Entregable de proyecto", "Desarrollo de proyecto", "Proyecto final" o similares que sean hitos calificados.
-- NO DEBES EXTRAER: Ignora por completo actividades rutinarias como "Laboratorio", "Práctica dirigida", "Discusión", "Desarrollo de algoritmos", u otros que se dan siempre y no son hitos principales.
+REGLAS ESTRICTAS DE EVALUACIONES (OBLIGATORIAS):
+1. EXAMEN PARCIAL:
+   - Solo puede haber COMO MÁXIMO UN (1) "Examen Parcial" en todo el curso.
+   - Ocurre a mitad de semestre, típicamente en la SEMANA 8.
+   - NUNCA generes más de un Examen Parcial.
 
-Para cada evaluación principal extraída proporciona:
-- nombre: nombre descriptivo (ej. "Práctica Calificada 1", "Avance de Proyecto Final").
-- semana: número entero de la semana en la que ocurre (ej. 8). Si el sílabo no menciona semana exacta, usa 0. Asegúrate de leer bien la columna de la semana donde aparece el hito.
-- peso: porcentaje de la nota final (ej. 30). Si no hay, usa 0.
+2. EXAMEN FINAL:
+   - Solo puede haber COMO MÁXIMO UN (1) "Examen Final" en todo el curso.
+   - Ocurre en la última semana del semestre, típicamente en la SEMANA 16.
+   - NUNCA pongas un "Examen Final" en la semana 8 ni en la misma fecha que el Examen Parcial.
+
+3. PROYECTOS Y ENTREGABLES:
+   - En la semana 15 (o la penúltima semana previa al examen final) es la presentación o entrega final del proyecto. Nómbralo: "Presentación de Proyecto Final".
+   - Si en el sílabo aparecen entregas o avances previos de proyecto (por ejemplo cada 3 semanas: semanas 3, 6, 9, 12, etc.), NUNCA los llames "Proyecto Final".
+   - Nómbralos en orden cronológico como entregables: "1er Entregable de Proyecto", "2do Entregable de Proyecto", "3er Entregable de Proyecto", etc.
+   - Solo puede haber UNA entrega final de proyecto (en la semana 15).
+
+4. PRÁCTICAS CALIFICADAS (PC):
+   - Si el curso tiene prácticas calificadas, extrae COMO MÁXIMO 2 (o menos si hay 1 o ninguna).
+   - Nómbralas "Práctica Calificada 1" y "Práctica Calificada 2". No extraigas más de 2 prácticas calificadas.
+
+5. ACTIVIDADES A IGNORAR:
+   - Ignora por completo actividades rutinarias como "Laboratorio semanal", "Práctica dirigida", "Discusión", "Desarrollo de algoritmos", clases normales o lecturas que no sean evaluaciones formales.
+
+Para cada evaluación extraída proporciona:
+- nombre: nombre descriptivo y normalizado según las reglas anteriores (ej. "Práctica Calificada 1", "Examen Parcial", "1er Entregable de Proyecto", "Presentación de Proyecto Final", "Examen Final").
+- semana: número entero de la semana en la que ocurre (ej. 8). Asegúrate de leer cuidadosamente la columna o fila de la semana donde está la evaluación.
+- peso: porcentaje de la nota final (ej. 20). Si no se indica porcentaje, usa 0.
 
 Devuelve ÚNICAMENTE el JSON solicitado.
 
@@ -147,6 +167,163 @@ async def upload_pdf(file: UploadFile = File(...)):
             raise HTTPException(status_code=502, detail="Error interno al comunicarse con la Inteligencia Artificial.")
             
     import re
+    from datetime import datetime, timedelta
+
+    def sanitize_evaluaciones(raw_evals: list[dict]) -> list[dict]:
+        """
+        Aplica las reglas estrictas de negocio para sílabos universitarios:
+        1. Máximo 1 Examen Parcial (típicamente semana 8).
+        2. Máximo 1 Examen Final (típicamente semana 16, nunca en semanas iniciales/semana 8).
+        3. Prácticas Calificadas: Máximo 2 o menos (PC1 y PC2).
+        4. Proyectos: En semana 15 (o semana final de presentación) es 'Presentación de Proyecto Final'.
+           Si hay entregas previas (semanas 3, 6, 9, 12, etc.), se nombran '1er Entregable de Proyecto',
+           '2do Entregable de Proyecto', etc. Nunca repetir 'Proyecto Final' antes de semana 15.
+           Si semana 15 ya tiene la Presentación, descarta duplicados en semana 16.
+        5. Deduplicación de eventos en la misma semana/fecha con títulos conflictivos.
+        """
+        if not raw_evals:
+            return []
+
+        cleaned = []
+        for ev in raw_evals:
+            nombre = str(ev.get("nombre", "")).strip()
+            if not nombre:
+                continue
+            try:
+                semana = int(ev.get("semana", 0))
+            except (ValueError, TypeError):
+                semana = 0
+            try:
+                peso = int(ev.get("peso", 0))
+            except (ValueError, TypeError):
+                peso = 0
+            cleaned.append({
+                "nombre": nombre,
+                "semana": semana,
+                "peso": peso
+            })
+
+        parcial_candidates = []
+        final_candidates = []
+        practica_candidates = []
+        proyecto_candidates = []
+        otros_candidates = []
+
+        for ev in cleaned:
+            nombre_lower = ev["nombre"].lower()
+            
+            is_proyecto = bool(re.search(r"\b(proyecto|avance|entregable|sustentaci[oó]n|informe)\b", nombre_lower))
+            is_practica = bool(re.search(r"(pr[aá]ctica\s+calificad[ao]|\bpc\b|\bpc\s*\d|\bpr[aá]ctica\s*\d)", nombre_lower))
+            is_parcial = bool(re.search(r"\b(parcial|ep)\b", nombre_lower)) and not is_proyecto
+            is_final = bool(re.search(r"\b(final|ef)\b", nombre_lower)) and not is_proyecto and not is_parcial
+
+            if is_parcial:
+                parcial_candidates.append(ev)
+            elif is_final:
+                final_candidates.append(ev)
+            elif is_practica:
+                practica_candidates.append(ev)
+            elif is_proyecto:
+                proyecto_candidates.append(ev)
+            else:
+                otros_candidates.append(ev)
+
+        result = []
+
+        # 1. Regla: Exactamente MÁXIMO 1 Examen Parcial
+        if parcial_candidates:
+            best_parcial = min(
+                parcial_candidates,
+                key=lambda x: abs(x["semana"] - 8) if x["semana"] > 0 else 99
+            )
+            best_parcial["nombre"] = "Examen Parcial"
+            result.append(best_parcial)
+
+        # 2. Regla: Exactamente MÁXIMO 1 Examen Final
+        if final_candidates:
+            valid_final_candidates = [
+                f for f in final_candidates 
+                if f["semana"] >= 13 or (f["semana"] > 8 and not any(p["semana"] == f["semana"] for p in result))
+            ]
+            if valid_final_candidates:
+                best_final = max(valid_final_candidates, key=lambda x: x["semana"])
+                best_final["nombre"] = "Examen Final"
+                result.append(best_final)
+            elif not any(r["nombre"] == "Examen Parcial" for r in result):
+                best_final = max(final_candidates, key=lambda x: x["semana"])
+                best_final["nombre"] = "Examen Final"
+                result.append(best_final)
+
+        # 3. Regla: Prácticas Calificadas (Máximo 2 o menos)
+        if practica_candidates:
+            practica_candidates.sort(key=lambda x: x["semana"])
+            unique_pcs = []
+            seen_weeks = set()
+            for pc in practica_candidates:
+                w = pc["semana"]
+                if w not in seen_weeks or w == 0:
+                    unique_pcs.append(pc)
+                    if w > 0:
+                        seen_weeks.add(w)
+            selected_pcs = unique_pcs[:2]
+            if len(selected_pcs) == 1:
+                selected_pcs[0]["nombre"] = "Práctica Calificada 1"
+            elif len(selected_pcs) >= 2:
+                selected_pcs[0]["nombre"] = "Práctica Calificada 1"
+                selected_pcs[1]["nombre"] = "Práctica Calificada 2"
+            result.extend(selected_pcs)
+
+        # 4. Regla: Proyectos y Entregables
+        if proyecto_candidates:
+            proyecto_candidates.sort(key=lambda x: x["semana"])
+            unique_proyectos = []
+            seen_weeks_proj = set()
+            for pr in proyecto_candidates:
+                w = pr["semana"]
+                if w not in seen_weeks_proj or w == 0:
+                    unique_proyectos.append(pr)
+                    if w > 0:
+                        seen_weeks_proj.add(w)
+
+            # Si semana 15 ya tiene el proyecto final, descartar duplicado espurio en semana 16
+            if any(p["semana"] == 15 for p in unique_proyectos) and any(p["semana"] == 16 for p in unique_proyectos):
+                unique_proyectos = [p for p in unique_proyectos if p["semana"] != 16]
+
+            ordinals = {1: "1er", 2: "2do", 3: "3er", 4: "4to", 5: "5to", 6: "6to", 7: "7mo", 8: "8vo"}
+
+            if len(unique_proyectos) == 1:
+                p = unique_proyectos[0]
+                if p["semana"] >= 14 or p["semana"] == 0:
+                    p["nombre"] = "Presentación de Proyecto Final"
+                else:
+                    p["nombre"] = "1er Entregable de Proyecto"
+                result.append(p)
+            else:
+                final_proj_idx = -1
+                for idx, p in enumerate(unique_proyectos):
+                    if p["semana"] == 15:
+                        final_proj_idx = idx
+                        break
+                if final_proj_idx == -1 and unique_proyectos[-1]["semana"] >= 14:
+                    final_proj_idx = len(unique_proyectos) - 1
+
+                entregable_count = 1
+                for idx, p in enumerate(unique_proyectos):
+                    if idx == final_proj_idx:
+                        p["nombre"] = "Presentación de Proyecto Final"
+                    else:
+                        ord_str = ordinals.get(entregable_count, f"{entregable_count}°")
+                        p["nombre"] = f"{ord_str} Entregable de Proyecto"
+                        entregable_count += 1
+                    result.append(p)
+
+        # 5. Otros Hitos
+        for ot in otros_candidates:
+            if not any(r["nombre"] == ot["nombre"] and r["semana"] == ot["semana"] for r in result):
+                result.append(ot)
+
+        result.sort(key=lambda x: (x["semana"] if x["semana"] > 0 else 999, x["nombre"]))
+        return result
     
     def extract_evaluations_without_ai(text: str):
         fecha_inicio = "0000-00-00"
@@ -171,7 +348,7 @@ async def upload_pdf(file: UploadFile = File(...)):
                 current_week = int(week_match.group(1))
                 
             # Buscar hitos importantes
-            eval_match = re.search(r"(Pr[aá]ctica\s+Calificad[ao]|Examen\s+Parcial|Examen\s+Final|Proyecto\s+Final|Avance\s+de\s+Proyecto)", line, re.IGNORECASE)
+            eval_match = re.search(r"(Pr[aá]ctica\s+Calificad[ao]|Examen\s+Parcial|Examen\s+Final|Proyecto\s+Final|Avance\s+de\s+Proyecto|Entregable)", line, re.IGNORECASE)
             if eval_match:
                 nombre = eval_match.group(1).strip().title()
                 
@@ -198,17 +375,17 @@ async def upload_pdf(file: UploadFile = File(...)):
         except json.JSONDecodeError:
             parsed = extract_evaluations_without_ai(raw_text)
             
-    from datetime import datetime, timedelta
-    
     fecha_inicio_str = parsed.get("fecha_inicio", "0000-00-00")
     dia_clases_str = parsed.get("dia_clases", "")
     raw_evaluaciones = parsed.get("evaluaciones", [])
+    
+    # Sanitizar y ordenar evaluaciones según reglas estrictas
+    sanitized_evals = sanitize_evaluaciones(raw_evaluaciones)
+
     dias_map = {
         "lunes": 0, "martes": 1, "miercoles": 2, "jueves": 3,
         "viernes": 4, "sabado": 5, "domingo": 6
     }
-    
-    evaluaciones = []
     
     start_date = None
     if fecha_inicio_str and fecha_inicio_str != "0000-00-00":
@@ -226,7 +403,8 @@ async def upload_pdf(file: UploadFile = File(...)):
             days_ahead += 7
         first_class_date = start_date + timedelta(days=days_ahead)
         
-    for ev in raw_evaluaciones:
+    evaluaciones = []
+    for ev in sanitized_evals:
         semana = ev.get("semana", 0)
         fecha_final = "0000-00-00"
         if semana > 0 and first_class_date:
@@ -236,7 +414,8 @@ async def upload_pdf(file: UploadFile = File(...)):
         evaluaciones.append({
             "nombre": ev.get("nombre", "Evaluación"),
             "fecha": fecha_final,
-            "peso": ev.get("peso", 0)
+            "peso": ev.get("peso", 0),
+            "semana": semana
         })
 
     # 3. Retornar los eventos en formato JSON
