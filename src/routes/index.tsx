@@ -532,6 +532,8 @@ function Index() {
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
@@ -547,6 +549,9 @@ function Index() {
       setFileName("");
       setPhase("idle");
       setErrorMessage("");
+      setEditingId(null);
+      setEditTitle("");
+      setEditDate("");
       await logout();
       toast.success("Has cerrado sesión exitosamente");
     } catch (err) {
@@ -694,6 +699,9 @@ function Index() {
     setEvents([]);
     setSelectedFile(null);
     setCurrentDate(new Date());
+    setEditingId(null);
+    setEditTitle("");
+    setEditDate("");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -711,21 +719,82 @@ function Index() {
     toast.info("Evaluación eliminada");
   };
 
-  const handleUpdateTitle = (id: string, newTitle: string) => {
-    if (!newTitle.trim()) return;
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              title: newTitle,
-              tooltip: newTitle,
-              category: categorizeEvent(newTitle),
-            }
-          : e,
-      ),
-    );
+  const startEditing = (ev: SyllabotEvent) => {
+    setEditingId(ev.id);
+    setEditTitle(ev.title.replace(/ ⚠️/g, ""));
+    if (ev.hasExactDate && !isNaN(ev.start.getTime())) {
+      try {
+        setEditDate(format(ev.start, "yyyy-MM-dd"));
+      } catch {
+        setEditDate("");
+      }
+    } else {
+      setEditDate("");
+    }
+  };
+
+  const cancelEditing = () => {
     setEditingId(null);
+    setEditTitle("");
+    setEditDate("");
+  };
+
+  const handleSaveEvent = (id: string) => {
+    const cleanTitle = editTitle.trim();
+    if (!cleanTitle) {
+      toast.error("El nombre de la evaluación no puede estar vacío");
+      return;
+    }
+
+    let dateWasUpdated = false;
+    let targetDate: Date | null = null;
+
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== id) return e;
+
+        let newStart = e.start;
+        let newEnd = e.end;
+        let hasExact = e.hasExactDate;
+
+        if (editDate) {
+          const parsed = new Date(`${editDate}T10:00:00`);
+          if (!isNaN(parsed.getTime())) {
+            newStart = parsed;
+            newEnd = new Date(parsed.getTime() + 2 * 60 * 60 * 1000);
+            hasExact = true;
+            dateWasUpdated = true;
+            targetDate = parsed;
+          }
+        }
+
+        const dateWarning = hasExact ? "" : " ⚠️";
+
+        return {
+          ...e,
+          title: cleanTitle + dateWarning,
+          tooltip: `${cleanTitle}${typeof e.peso === "number" && e.peso > 0 ? ` (${e.peso}%)` : ""}${
+            hasExact ? "" : " (Fecha sin especificar)"
+          }`,
+          start: newStart,
+          end: newEnd,
+          hasExactDate: hasExact,
+          isVagueDate: !hasExact,
+          category: categorizeEvent(cleanTitle),
+        };
+      }),
+    );
+
+    if (dateWasUpdated && targetDate) {
+      setCurrentDate(targetDate);
+      toast.success("Fecha actualizada y posicionada en el calendario");
+    } else {
+      toast.success("Evaluación actualizada");
+    }
+
+    setEditingId(null);
+    setEditTitle("");
+    setEditDate("");
   };
 
   const handleAddCustomEvent = (e: React.FormEvent) => {
@@ -1142,75 +1211,140 @@ function Index() {
                     return (
                       <div
                         key={ev.id}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                          ev.selected
-                            ? "bg-card border-border shadow-xs"
-                            : "bg-muted/30 border-transparent opacity-60"
+                        className={`p-3 rounded-xl border transition-all ${
+                          isEditing
+                            ? "bg-card border-primary/50 shadow-sm ring-1 ring-primary/20"
+                            : ev.selected
+                              ? "bg-card border-border shadow-xs"
+                              : "bg-muted/30 border-transparent opacity-60"
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <input
-                            type="checkbox"
-                            checked={ev.selected}
-                            onChange={() => toggleSelectEvent(ev.id)}
-                            className="size-4 rounded text-primary focus:ring-primary cursor-pointer shrink-0"
-                          />
-
-                          <div className="min-w-0 flex-1">
-                            {isEditing ? (
-                              <input
-                                autoFocus
-                                defaultValue={ev.title.replace(/ ⚠️/g, "")}
-                                onBlur={(e) => handleUpdateTitle(ev.id, e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter")
-                                    handleUpdateTitle(ev.id, (e.target as HTMLInputElement).value);
-                                }}
-                                className="w-full text-xs font-semibold px-2 py-1 rounded border border-primary bg-background text-foreground"
-                              />
-                            ) : (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-foreground truncate">
-                                  {ev.title.replace(/ ⚠️/g, "")}
-                                </span>
-                                <span
-                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catStyle.badge}`}
+                        {isEditing ? (
+                          <div className="flex flex-col gap-2.5 w-full">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                                <Edit2 size={12} /> Editando evaluación
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEvent(ev.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
+                                  title="Guardar cambios"
                                 >
-                                  {catStyle.label}
-                                </span>
+                                  <Check size={12} className="stroke-[3]" /> Guardar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEditing}
+                                  className="p-1 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                                  title="Cancelar"
+                                >
+                                  <X size={14} />
+                                </button>
                               </div>
-                            )}
+                            </div>
 
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {ev.hasExactDate ? (
-                                format(ev.start, "dd/MM/yyyy", { locale: es })
-                              ) : (
-                                <span className="text-amber-600 dark:text-amber-400 font-medium">
-                                  Fecha por confirmar
-                                </span>
-                              )}
-                              {ev.peso ? ` &bull; ${ev.peso}% de la nota` : ""}
-                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">
+                                  Nombre de la evaluación
+                                </label>
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={editTitle}
+                                  onChange={(e) => setEditTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleSaveEvent(ev.id);
+                                    } else if (e.key === "Escape") {
+                                      cancelEditing();
+                                    }
+                                  }}
+                                  placeholder="Ej. Examen Parcial"
+                                  className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-primary/50 focus:border-primary bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-semibold text-muted-foreground block mb-1">
+                                  Fecha de la evaluación
+                                </label>
+                                <input
+                                  type="date"
+                                  value={editDate}
+                                  onChange={(e) => setEditDate(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleSaveEvent(ev.id);
+                                    } else if (e.key === "Escape") {
+                                      cancelEditing();
+                                    }
+                                  }}
+                                  className="w-full text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border focus:border-primary bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <input
+                                type="checkbox"
+                                checked={ev.selected}
+                                onChange={() => toggleSelectEvent(ev.id)}
+                                className="size-4 rounded text-primary focus:ring-primary cursor-pointer shrink-0"
+                              />
 
-                        {/* Botones de acción */}
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <button
-                            onClick={() => setEditingId(isEditing ? null : ev.id)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                            title="Editar título"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button
-                            onClick={() => deleteEvent(ev.id)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            title="Eliminar evento"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-foreground truncate">
+                                    {ev.title.replace(/ ⚠️/g, "")}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catStyle.badge}`}
+                                  >
+                                    {catStyle.label}
+                                  </span>
+                                </div>
+
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {ev.hasExactDate ? (
+                                    format(ev.start, "dd/MM/yyyy", { locale: es })
+                                  ) : (
+                                    <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                      Fecha por confirmar
+                                    </span>
+                                  )}
+                                  {ev.peso ? ` &bull; ${ev.peso}% de la nota` : ""}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Botones de acción */}
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditing(ev)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                                title="Editar evaluación y fecha"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteEvent(ev.id)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
+                                title="Eliminar evento"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
