@@ -1673,7 +1673,7 @@ function Index() {
                                       Fecha por confirmar
                                     </span>
                                   )}
-                                  {ev.peso ? ` &bull; ${ev.peso}% de la nota` : ""}
+                                  {ev.peso ? ` • ${ev.peso}% de la nota` : ""}
                                 </p>
                               </div>
                             </div>
