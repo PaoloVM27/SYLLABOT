@@ -1072,11 +1072,16 @@ function Index() {
       toast.dismiss(syncToastId);
       confetti({ particleCount: 90, spread: 75, origin: { y: 0.55 } });
 
-      // Abrir modal centrado con fondo difuminado en lugar de toast superior
+      const finalCourseName = courseName.trim() || "Tu Asignatura";
+
+      // Limpiar el fondo (calendario, archivo y revisión) dejándolo listo para subir otro archivo
+      reset();
+
+      // Abrir modal centrado con fondo difuminado
       setSuccessModalData({
         open: true,
         count: successCount,
-        courseName: courseName.trim() || "Tu Asignatura",
+        courseName: finalCourseName,
       });
     } catch (err: unknown) {
       toast.dismiss(syncToastId);
