@@ -229,3 +229,15 @@
     padding: 1px 3px !important;
   }
 }
+
+/* ── Animación suave de marquesina para nombres largos de archivo al pasar el cursor ── */
+@keyframes marquee-bounce {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  85%,
+  100% {
+    transform: translateX(var(--marquee-dist, -60px));
+  }
+}

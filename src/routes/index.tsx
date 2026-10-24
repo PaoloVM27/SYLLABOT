@@ -531,6 +531,55 @@ function sanitizeEvaluacionesFrontend(rawList: RawEval[]): RawEval[] {
   return result;
 }
 
+function MarqueeFileName({ name }: { name: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [scrollDistance, setScrollDistance] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    const updateDistance = () => {
+      if (containerRef.current && textRef.current) {
+        const diff = textRef.current.scrollWidth - containerRef.current.clientWidth;
+        setScrollDistance(diff > 0 ? diff : 0);
+      }
+    };
+    updateDistance();
+    window.addEventListener("resize", updateDistance);
+    return () => window.removeEventListener("resize", updateDistance);
+  }, [name]);
+
+  const hasOverflow = scrollDistance > 0;
+  const duration = Math.max(3.5, (scrollDistance / 35) * 2);
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="relative w-full overflow-hidden cursor-default"
+      title={name}
+    >
+      <p
+        ref={textRef}
+        style={
+          isHovered && hasOverflow
+            ? ({
+                animation: `marquee-bounce ${duration}s ease-in-out infinite alternate`,
+                "--marquee-dist": `-${scrollDistance + 6}px`,
+              } as React.CSSProperties)
+            : { transform: "translateX(0)" }
+        }
+        className={`text-sm font-semibold text-foreground whitespace-nowrap inline-block transition-transform ${
+          !isHovered && hasOverflow ? "truncate max-w-full block" : ""
+        }`}
+      >
+        {name}
+      </p>
+    </div>
+  );
+}
+
 function Index() {
   const { user, loading, logout } = useAuth();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -1331,7 +1380,7 @@ function Index() {
       {/* ── Main Two-Column Layout Adaptable a Móvil, Tablet y Desktop ── */}
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col lg:flex-row gap-8 lg:gap-10 px-4 sm:px-6 pb-16 sm:pb-20 pt-6 sm:pt-8 lg:pt-10">
         {/* Left Column: Upload & Review */}
-        <div className="flex-1 flex flex-col items-start text-left w-full max-w-2xl lg:max-w-none mx-auto lg:mx-0">
+        <div className="w-full lg:w-[420px] xl:w-[450px] lg:shrink-0 flex flex-col items-start text-left max-w-2xl lg:max-w-none mx-auto lg:mx-0 min-w-0">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight tracking-tight text-foreground mb-3 text-center lg:text-left w-full lg:w-auto">
             Tu semestre organizado en segundos.
           </h1>
@@ -1388,16 +1437,14 @@ function Index() {
                     </>
                   ) : phase === "file" && selectedFile ? (
                     <div className="w-full flex flex-col items-center">
-                      <div className="w-full bg-muted/50 border border-border rounded-xl p-4 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-full bg-muted/50 border border-border rounded-xl p-4 flex items-center justify-between gap-3 min-w-0 overflow-hidden">
+                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                           <span className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
                             <FileText size={22} />
                           </span>
-                          <div className="min-w-0 text-left">
-                            <p className="text-sm font-semibold text-foreground truncate">
-                              {fileName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
+                          <div className="min-w-0 text-left flex-1 overflow-hidden">
+                            <MarqueeFileName name={fileName} />
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {formatFileSize(selectedFile.size)} &bull;{" "}
                               <span className="text-emerald-600 font-medium dark:text-emerald-400">
                                 Listo para analizar
@@ -1743,7 +1790,7 @@ function Index() {
         </div>
 
         {/* ── Right Column: Calendar Preview Adaptable ── */}
-        <div className="flex-[1.5] flex flex-col bg-card border border-border rounded-2xl shadow-sm overflow-hidden min-h-[500px] h-[580px] sm:h-[640px] lg:h-[720px] w-full">
+        <div className="flex-1 min-w-0 flex flex-col bg-card border border-border rounded-2xl shadow-sm overflow-hidden min-h-[500px] h-[580px] sm:h-[640px] lg:h-[720px] w-full">
           {/* Calendar Header */}
           <div className="p-4 sm:px-6 sm:py-3.5 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
             <div>
