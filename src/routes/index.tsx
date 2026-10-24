@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CloudUpload,
@@ -38,6 +38,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const locales = {
   es: es,
@@ -544,6 +551,30 @@ function Index() {
   const [newEventCategory, setNewEventCategory] = useState<EventCategory>("practica");
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [courseName, setCourseName] = useState("");
+  const [isCalendarAuthorized, setIsCalendarAuthorized] = useState(false);
+  const [successModalData, setSuccessModalData] = useState<{
+    open: boolean;
+    count: number;
+    courseName: string;
+  }>({
+    open: false,
+    count: 0,
+    courseName: "",
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const authKey = `gcal_authorized_${user.uid}`;
+    const tokenKey = `gcal_token_${user.uid}`;
+    const expKey = `gcal_token_exp_${user.uid}`;
+    const hasAuthorized = localStorage.getItem(authKey) === "true";
+    const cachedToken = sessionStorage.getItem(tokenKey);
+    const cachedExp = sessionStorage.getItem(expKey);
+
+    if (hasAuthorized || (cachedToken && cachedExp && Date.now() < Number(cachedExp))) {
+      setIsCalendarAuthorized(true);
+    }
+  }, [user]);
 
   const deriveCourseName = (fileName: string, detectedCourse?: string): string => {
     if (detectedCourse && detectedCourse.trim()) return detectedCourse.trim();
@@ -574,6 +605,8 @@ function Index() {
       setEditTitle("");
       setEditDate("");
       setCourseName("");
+      setIsCalendarAuthorized(false);
+      setSuccessModalData({ open: false, count: 0, courseName: "" });
       sessionStorage.clear();
       await logout();
       toast.success("Has cerrado sesión exitosamente");
@@ -982,19 +1015,20 @@ function Index() {
         successCount++;
       }
 
-      toast.dismiss(syncToastId);
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      if (user?.uid) {
+        localStorage.setItem(`gcal_authorized_${user.uid}`, "true");
+      }
+      setIsCalendarAuthorized(true);
 
-      toast.success(
-        `¡Listo! Se agregaron ${successCount} eventos a tu Google Calendar institucional.`,
-        {
-          duration: 7000,
-          action: {
-            label: "Ver Calendar",
-            onClick: () => window.open("https://calendar.google.com", "_blank"),
-          },
-        },
-      );
+      toast.dismiss(syncToastId);
+      confetti({ particleCount: 90, spread: 75, origin: { y: 0.55 } });
+
+      // Abrir modal centrado con fondo difuminado en lugar de toast superior
+      setSuccessModalData({
+        open: true,
+        count: successCount,
+        courseName: courseName.trim() || "Tu Asignatura",
+      });
     } catch (err: unknown) {
       toast.dismiss(syncToastId);
       console.error("Error sincronizando con Google Calendar:", err);
@@ -1225,6 +1259,74 @@ function Index() {
 
       {/* Modal de Configuración */}
       <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} user={user} />
+
+      {/* ── Modal Emergente de Éxito de Exportación al Centro de la Pantalla ── */}
+      <Dialog
+        open={successModalData.open}
+        onOpenChange={(open) => setSuccessModalData((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md bg-card border border-border/80 shadow-2xl rounded-2xl p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="flex flex-col items-center justify-center gap-4 py-2">
+            {/* Icono de Check con Halo Esmeralda */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
+              <div className="relative size-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-sm">
+                <CheckCircle2 size={36} className="stroke-[2.5]" />
+              </div>
+            </div>
+
+            <DialogHeader className="text-center sm:text-center space-y-1.5">
+              <DialogTitle className="text-xl sm:text-2xl font-black text-foreground tracking-tight text-center">
+                ¡Exportación Completada!
+              </DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed text-center">
+                Se agregaron exitosamente{" "}
+                <span className="font-bold text-foreground">
+                  {successModalData.count} evaluaciones
+                </span>{" "}
+                a tu Google Calendar de San Marcos.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Tarjeta resumen del curso exportado */}
+            <div className="w-full bg-muted/40 border border-border/80 rounded-xl p-3.5 text-left text-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <BookOpen size={15} className="text-primary shrink-0" />
+                <span className="font-semibold text-foreground truncate">
+                  {successModalData.courseName}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <CalendarIcon size={14} className="text-emerald-500 shrink-0" />
+                <span>Recordatorios configurados: 1 día y 2 horas antes</span>
+              </div>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.open("https://calendar.google.com", "_blank");
+                  setSuccessModalData((prev) => ({ ...prev, open: false }));
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer"
+              >
+                <span>Ver en Google Calendar</span>
+                <ExternalLink size={15} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSuccessModalData((prev) => ({ ...prev, open: false }))}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border/80 bg-background hover:bg-muted text-foreground text-xs sm:text-sm font-semibold transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Main Two-Column Layout Adaptable a Móvil, Tablet y Desktop ── */}
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col lg:flex-row gap-8 lg:gap-10 px-4 sm:px-6 pb-16 sm:pb-20 pt-6 sm:pt-8 lg:pt-10">
@@ -1661,17 +1763,25 @@ function Index() {
                 onClick={handleSyncGoogleCalendar}
                 disabled={activeEventsCount === 0 || isSyncingCalendar}
                 className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 flex-1 sm:flex-none"
-                title="Sincronizar directamente con tu cuenta de Google Calendar institucional"
+                title={
+                  isCalendarAuthorized
+                    ? "Exportar directamente a tu Google Calendar institucional"
+                    : "Sincronizar y vincular tu Google Calendar institucional"
+                }
               >
                 {isSyncingCalendar ? (
                   <>
                     <Loader2 size={15} className="animate-spin" />
-                    <span>Sincronizando...</span>
+                    <span>{isCalendarAuthorized ? "Exportando..." : "Sincronizando..."}</span>
                   </>
                 ) : (
                   <>
                     <CalendarIcon size={15} />
-                    <span>Sincronizar con Google Calendar</span>
+                    <span>
+                      {isCalendarAuthorized
+                        ? "Exportar a Google Calendar"
+                        : "Sincronizar con Google Calendar"}
+                    </span>
                   </>
                 )}
               </button>
