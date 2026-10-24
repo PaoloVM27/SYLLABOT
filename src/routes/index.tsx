@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { LoginScreen } from "@/auth/LoginScreen";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { es } from "date-fns/locale";
@@ -539,6 +541,7 @@ function Index() {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventCategory, setNewEventCategory] = useState<EventCategory>("practica");
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -829,6 +832,129 @@ function Index() {
     setNewEventDate("");
     setShowAddModal(false);
     toast.success("Evaluación agregada manualmente");
+  };
+
+  /* ── Sincronizar directamente con Google Calendar ── */
+  const handleSyncGoogleCalendar = async () => {
+    const activeEvents = events.filter((e) => e.selected);
+    if (activeEvents.length === 0) {
+      toast.error("Selecciona al menos una evaluación para sincronizar.");
+      return;
+    }
+
+    setIsSyncingCalendar(true);
+    const syncToastId = toast.loading("Conectando con Google Calendar...");
+
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope("https://www.googleapis.com/auth/calendar.events");
+      if (user?.email) {
+        provider.setCustomParameters({
+          login_hint: user.email,
+          prompt: "consent",
+        });
+      }
+
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential?.accessToken;
+
+      if (!accessToken) {
+        throw new Error("No se pudo obtener el token de acceso de Google Calendar.");
+      }
+
+      toast.loading(`Sincronizando ${activeEvents.length} evaluaciones con tu Google Calendar...`, {
+        id: syncToastId,
+      });
+
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Lima";
+
+      let successCount = 0;
+      for (const ev of activeEvents) {
+        const cleanTitle = ev.title.replace(/ ⚠️/g, "");
+        const descriptionLines = [
+          "📌 Evaluación sincronizada automáticamente por Syllabot UNMSM.",
+          ev.description ? `Detalle: ${ev.description}` : "",
+          ev.hasExactDate === false
+            ? "⚠️ Advertencia: Fecha estimada en el sílabo. Confirma la fecha exacta con tu docente."
+            : "",
+        ].filter(Boolean);
+
+        let colorId = "9"; // Azul marino (Prácticas)
+        if (ev.category === "examen")
+          colorId = "11"; // Rojo (Exámenes)
+        else if (ev.category === "proyecto") colorId = "5"; // Amarillo (Proyectos)
+
+        const eventPayload = {
+          summary: cleanTitle,
+          description: descriptionLines.join("\n\n"),
+          start: {
+            dateTime: ev.start.toISOString(),
+            timeZone,
+          },
+          end: {
+            dateTime: ev.end.toISOString(),
+            timeZone,
+          },
+          colorId,
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: "popup", minutes: 24 * 60 },
+              { method: "popup", minutes: 120 },
+            ],
+          },
+        };
+
+        const response = await fetch(
+          "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(eventPayload),
+          },
+        );
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => null);
+          console.error("Error al crear evento en Google Calendar:", errBody);
+          throw new Error(
+            errBody?.error?.message || `Error al guardar "${cleanTitle}" en Google Calendar.`,
+          );
+        }
+        successCount++;
+      }
+
+      toast.dismiss(syncToastId);
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+
+      toast.success(
+        `¡Listo! Se agregaron ${successCount} eventos a tu Google Calendar institucional.`,
+        {
+          duration: 7000,
+          action: {
+            label: "Ver Calendar",
+            onClick: () => window.open("https://calendar.google.com", "_blank"),
+          },
+        },
+      );
+    } catch (err: unknown) {
+      toast.dismiss(syncToastId);
+      console.error("Error sincronizando con Google Calendar:", err);
+      const message =
+        err instanceof Error ? err.message : "Ocurrió un error al sincronizar con Google Calendar.";
+
+      if (typeof message === "string" && message.includes("auth/popup-closed-by-user")) {
+        toast.info("Sincronización cancelada.");
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsSyncingCalendar(false);
+    }
   };
 
   /* ── Exportar a archivo estándar .ics (Google Calendar / Apple / Outlook) ── */
@@ -1455,16 +1581,37 @@ function Index() {
               )}
             </div>
 
-            {/* Botón de Exportar a Calendar */}
-            <button
-              onClick={handleExportICS}
-              disabled={activeEventsCount === 0}
-              className="flex items-center justify-center gap-2 bg-[#4285F4] text-white px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all hover:bg-[#3367d6] hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 w-full sm:w-auto"
-              title="Descargar archivo de calendario .ics para Google Calendar"
-            >
-              <Download size={15} />
-              Exportar a Calendar (.ics)
-            </button>
+            {/* Botones de Sincronización y Exportación */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+              <button
+                onClick={handleSyncGoogleCalendar}
+                disabled={activeEventsCount === 0 || isSyncingCalendar}
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 flex-1 sm:flex-none"
+                title="Sincronizar directamente con tu cuenta de Google Calendar institucional"
+              >
+                {isSyncingCalendar ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Sincronizando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CalendarIcon size={15} />
+                    <span>Sincronizar con Google Calendar</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleExportICS}
+                disabled={activeEventsCount === 0 || isSyncingCalendar}
+                className="flex items-center justify-center gap-1.5 bg-muted/80 hover:bg-muted text-foreground border border-border/80 px-3 py-2.5 sm:py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs shrink-0"
+                title="Descargar archivo .ics estándar para Apple Calendar u Outlook"
+              >
+                <Download size={14} />
+                <span>.ics</span>
+              </button>
+            </div>
           </div>
 
           {/* Leyenda de Colores */}

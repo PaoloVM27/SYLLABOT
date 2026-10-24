@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: import.meta.env["VITE_FIREBASE_API_KEY"] as string,
@@ -11,8 +12,15 @@ const firebaseConfig = {
   measurementId: import.meta.env["VITE_FIREBASE_MEASUREMENT_ID"] as string,
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-
 export const googleProvider = new GoogleAuthProvider();
-// Solo solicitamos perfil y correo para un inicio de sesión seguro y sin advertencias
+
+export let analytics: ReturnType<typeof getAnalytics> | null = null;
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  });
+}
