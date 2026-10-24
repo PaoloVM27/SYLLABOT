@@ -191,8 +191,16 @@ const MASCOT_CONFIG: Record<Phase, { src: string; message: string }> = {
   },
 };
 
-function MascotBubble({ phase }: { phase: Phase }) {
+function MascotBubble({ phase, progress }: { phase: Phase; progress?: number }) {
   const config = MASCOT_CONFIG[phase];
+  let message = config.message;
+  if (phase === "loading" && typeof progress === "number") {
+    if (progress < 30) message = "Extrayendo el texto de tu sílabo...";
+    else if (progress < 65) message = `Analizando evaluaciones con IA... ${progress}%`;
+    else if (progress < 95) message = `Sanitizando cronograma... ${progress}%`;
+    else message = "¡Listo! Generando tu calendario...";
+  }
+
   return (
     <div className="flex items-end gap-2.5 sm:gap-3.5 mb-6 justify-start">
       <div className="relative shrink-0">
@@ -203,9 +211,7 @@ function MascotBubble({ phase }: { phase: Phase }) {
         />
       </div>
       <div className="relative bg-card border border-border rounded-2xl rounded-bl-sm px-3.5 py-2.5 sm:px-4 sm:py-3 max-w-[240px] sm:max-w-xs shadow-sm">
-        <p className="text-xs sm:text-sm font-medium text-foreground leading-relaxed">
-          {config.message}
-        </p>
+        <p className="text-xs sm:text-sm font-medium text-foreground leading-relaxed">{message}</p>
         <div className="absolute -left-2 bottom-3 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-border" />
       </div>
     </div>
@@ -600,6 +606,7 @@ function Index() {
   const [newEventCategory, setNewEventCategory] = useState<EventCategory>("practica");
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [courseName, setCourseName] = useState("");
+  const [analysisProgress, setAnalysisProgress] = useState(0);
   const [isCalendarAuthorized, setIsCalendarAuthorized] = useState(false);
   const [successModalData, setSuccessModalData] = useState<{
     open: boolean;
@@ -654,6 +661,7 @@ function Index() {
       setEditTitle("");
       setEditDate("");
       setCourseName("");
+      setAnalysisProgress(0);
       setIsCalendarAuthorized(false);
       setSuccessModalData({ open: false, count: 0, courseName: "" });
       sessionStorage.clear();
@@ -700,8 +708,18 @@ function Index() {
     setPhase("loading");
     setErrorMessage("");
     setEvents([]);
+    setAnalysisProgress(5);
 
-    const toastLoadingId = toast.loading("Analizando sílabo con Inteligencia Artificial...");
+    // Animación de carga porcentual según el progreso del análisis
+    const progressInterval = setInterval(() => {
+      setAnalysisProgress((prev) => {
+        if (prev < 25) return prev + Math.floor(Math.random() * 3 + 2); // 5 -> 25 (subiendo archivo)
+        if (prev < 60) return prev + Math.floor(Math.random() * 2 + 1); // 25 -> 60 (extrayendo cronograma)
+        if (prev < 85) return prev + 1; // 60 -> 85 (IA procesando evaluaciones)
+        if (prev < 92) return Math.min(92, prev + 1); // 85 -> 92 (esperando respuesta final)
+        return prev;
+      });
+    }, 110);
 
     try {
       const formData = new FormData();
@@ -728,6 +746,11 @@ function Index() {
       const data = await res.json();
       const detectedCourse = deriveCourseName(selectedFile.name, data.curso);
       setCourseName(detectedCourse);
+
+      // Cuando la IA termina, avanzamos al 100%
+      clearInterval(progressInterval);
+      setAnalysisProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 450));
 
       let minDate = new Date();
       const rawEvaluaciones: RawEval[] = sanitizeEvaluacionesFrontend(data.evaluaciones || []);
@@ -786,12 +809,12 @@ function Index() {
       setCurrentDate(vagueDate);
       setPhase("success");
 
-      toast.dismiss(toastLoadingId);
       toast.success(
         `¡Análisis completado! Se detectaron ${parsedEvents.length} evaluaciones clave.`,
       );
     } catch (err) {
-      toast.dismiss(toastLoadingId);
+      clearInterval(progressInterval);
+      setAnalysisProgress(0);
       const msg = err instanceof Error ? err.message : "Error al conectar con el servidor.";
       setErrorMessage(msg);
       setPhase("error");
@@ -810,6 +833,7 @@ function Index() {
     setEditTitle("");
     setEditDate("");
     setCourseName("");
+    setAnalysisProgress(0);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -1398,7 +1422,7 @@ function Index() {
           <FlowStepper phase={phase} />
 
           {/* Mascot + Speech Bubble */}
-          <MascotBubble phase={phase} />
+          <MascotBubble phase={phase} progress={analysisProgress} />
 
           <div className="w-full">
             {phase === "idle" || phase === "file" || phase === "loading" ? (
@@ -1429,17 +1453,82 @@ function Index() {
                   />
 
                   {phase === "loading" ? (
-                    <>
-                      <Loader2 className="size-12 animate-spin text-primary" />
-                      <div className="text-center">
-                        <p className="text-lg font-bold text-foreground">
-                          Leyendo fechas con IA...
+                    <div className="w-full flex flex-col items-center justify-center py-2 animate-in fade-in duration-300">
+                      {/* Anillo de Carga Circular con Porcentaje en el Centro */}
+                      <div className="relative size-24 sm:size-28 flex items-center justify-center">
+                        <svg className="size-full -rotate-90" viewBox="0 0 100 100">
+                          {/* Círculo de fondo */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="40"
+                            className="stroke-muted/30"
+                            strokeWidth="8"
+                            fill="transparent"
+                          />
+                          {/* Círculo de progreso animado */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="40"
+                            stroke="url(#analysis-gradient)"
+                            strokeWidth="8"
+                            strokeLinecap="round"
+                            fill="transparent"
+                            strokeDasharray={251.32}
+                            strokeDashoffset={251.32 - (251.32 * analysisProgress) / 100}
+                            className="transition-all duration-300 ease-out"
+                          />
+                          <defs>
+                            <linearGradient
+                              id="analysis-gradient"
+                              x1="0%"
+                              y1="0%"
+                              x2="100%"
+                              y2="100%"
+                            >
+                              <stop offset="0%" stopColor="#4f46e5" />
+                              <stop offset="50%" stopColor="#6366f1" />
+                              <stop offset="100%" stopColor="#06b6d4" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+
+                        {/* Porcentaje en el Centro */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                          <span className="font-space text-2xl sm:text-3xl font-black text-foreground tracking-tight">
+                            {analysisProgress}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mensaje dinámico según el porcentaje de avance */}
+                      <div className="text-center mt-4 max-w-xs space-y-1">
+                        <p className="text-base sm:text-lg font-bold text-foreground">
+                          {analysisProgress < 25 && "Extrayendo texto del sílabo..."}
+                          {analysisProgress >= 25 &&
+                            analysisProgress < 65 &&
+                            "Analizando cronograma con IA..."}
+                          {analysisProgress >= 65 &&
+                            analysisProgress < 95 &&
+                            "Sanitizando exámenes y prácticas..."}
+                          {analysisProgress >= 95 && "¡Análisis completado al 100%!"}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Analizando cronograma, ponderaciones y evaluaciones
+                        <p className="text-xs text-muted-foreground">
+                          {analysisProgress < 95
+                            ? "Identificando parciales, finales y entregables"
+                            : "Generando tu calendario semestral..."}
                         </p>
                       </div>
-                    </>
+
+                      {/* Mini barra de progreso lineal de soporte */}
+                      <div className="w-48 sm:w-56 h-1.5 bg-muted/60 rounded-full mt-3 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${analysisProgress}%` }}
+                        />
+                      </div>
+                    </div>
                   ) : phase === "file" && selectedFile ? (
                     <div className="w-full flex flex-col items-center">
                       <div className="w-full bg-muted/50 border border-border rounded-xl p-4 flex items-center justify-between gap-3 min-w-0 overflow-hidden">
@@ -1498,10 +1587,10 @@ function Index() {
                   className="mt-5 w-full h-13 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 px-8 text-base font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:opacity-95 hover:shadow-lg hover:shadow-indigo-500/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
                 >
                   {phase === "loading" ? (
-                    <>
+                    <div className="flex items-center gap-2">
                       <Loader2 className="size-5 animate-spin" />
-                      Procesando sílabo...
-                    </>
+                      <span>Analizando sílabo ({analysisProgress}%)</span>
+                    </div>
                   ) : (
                     <>
                       <Sparkles className="size-5" />
