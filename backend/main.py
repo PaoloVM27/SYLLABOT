@@ -28,6 +28,7 @@ class Evaluacion(typing.TypedDict):
     peso: int
 
 class EvaluacionesResponse(typing.TypedDict):
+    nombre_curso: str  # ej. "Procesos Estocásticos"
     fecha_inicio: str  # YYYY-MM-DD
     dia_clases: str    # "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"
     evaluaciones: list[Evaluacion]
@@ -37,6 +38,7 @@ PROMPT_TEMPLATE = """
 Eres un asistente experto que extrae con máxima precisión datos y cronogramas de sílabos universitarios (como UNMSM).
 
 Extrae la siguiente información global del curso:
+- nombre_curso: El nombre oficial del curso o asignatura (ej. "Procesos Estocásticos", "Cálculo I", "Física II", etc.). Extrae solo el nombre limpio del curso. Si no aparece explícitamente, infiérelo del título o encabezado del sílabo.
 - fecha_inicio: Fecha de inicio de clases en formato YYYY-MM-DD (busca en los datos generales, ej. 24/08/2026 -> 2026-08-24). Si no la hay, usa "0000-00-00".
 - dia_clases: El día principal de la semana en el que se dicta la clase (ej. "Martes"). Usa solo una palabra en español, sin tildes. Si no hay, usa "".
 
@@ -326,6 +328,10 @@ async def upload_pdf(file: UploadFile = File(...)):
         return result
     
     def extract_evaluations_without_ai(text: str):
+        nombre_curso = ""
+        match_curso = re.search(r"(?:1\.1\s*)?(?:Nombre de la asignatura|Asignatura|Curso)\s*:\s*([^\n\r]+)", text, re.IGNORECASE)
+        if match_curso:
+            nombre_curso = match_curso.group(1).strip()
         fecha_inicio = "0000-00-00"
         match_inicio = re.search(r"Fecha de inicio\s*:\s*(\d{2}/\d{2}/\d{4})", text, re.IGNORECASE)
         if match_inicio:
@@ -360,6 +366,7 @@ async def upload_pdf(file: UploadFile = File(...)):
                         "peso": 0
                     })
         return {
+            "nombre_curso": nombre_curso,
             "fecha_inicio": fecha_inicio,
             "dia_clases": dia_clases,
             "evaluaciones": evals
@@ -419,4 +426,5 @@ async def upload_pdf(file: UploadFile = File(...)):
         })
 
     # 3. Retornar los eventos en formato JSON
-    return JSONResponse(content={"evaluaciones": evaluaciones})
+    nombre_curso = str(parsed.get("nombre_curso", "")).strip()
+    return JSONResponse(content={"evaluaciones": evaluaciones, "curso": nombre_curso})

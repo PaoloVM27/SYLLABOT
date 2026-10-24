@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Settings,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { LoginScreen } from "@/auth/LoginScreen";
@@ -542,6 +543,23 @@ function Index() {
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventCategory, setNewEventCategory] = useState<EventCategory>("practica");
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [courseName, setCourseName] = useState("");
+
+  const deriveCourseName = (fileName: string, detectedCourse?: string): string => {
+    if (detectedCourse && detectedCourse.trim()) return detectedCourse.trim();
+    let name = fileName.replace(/\.[^/.]+$/, "");
+    name = name.replace(/^(silabo|s[ií]labo|syllabus|unmsm|fisi|curso)[\s_\-–—]*/i, "");
+    name = name.replace(/[\s_\-–—]*(202\d([-\s]?[iIvV\d]+)?|semestre[\w-]*)$/i, "");
+    name = name.replace(/[_-]+/g, " ").trim();
+    if (name.length > 0) {
+      return name
+        .toLowerCase()
+        .split(" ")
+        .map((w) => (w.length > 2 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+        .join(" ");
+    }
+    return "Curso";
+  };
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -624,6 +642,8 @@ function Index() {
       }
 
       const data = await res.json();
+      const detectedCourse = deriveCourseName(selectedFile.name, data.curso);
+      setCourseName(detectedCourse);
 
       let minDate = new Date();
       const rawEvaluaciones: RawEval[] = sanitizeEvaluacionesFrontend(data.evaluaciones || []);
@@ -705,6 +725,7 @@ function Index() {
     setEditingId(null);
     setEditTitle("");
     setEditDate("");
+    setCourseName("");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -740,6 +761,7 @@ function Index() {
     setEditingId(null);
     setEditTitle("");
     setEditDate("");
+    setCourseName("");
   };
 
   const handleSaveEvent = (id: string) => {
@@ -798,6 +820,7 @@ function Index() {
     setEditingId(null);
     setEditTitle("");
     setEditDate("");
+    setCourseName("");
   };
 
   const handleAddCustomEvent = (e: React.FormEvent) => {
@@ -872,8 +895,13 @@ function Index() {
       let successCount = 0;
       for (const ev of activeEvents) {
         const cleanTitle = ev.title.replace(/ ⚠️/g, "");
+        const eventSummary = courseName.trim()
+          ? `${cleanTitle} - ${courseName.trim()}`
+          : cleanTitle;
+
         const descriptionLines = [
           "📌 Evaluación sincronizada automáticamente por Syllabot UNMSM.",
+          courseName.trim() ? `Curso: ${courseName.trim()}` : "",
           ev.description ? `Detalle: ${ev.description}` : "",
           ev.hasExactDate === false
             ? "⚠️ Advertencia: Fecha estimada en el sílabo. Confirma la fecha exacta con tu docente."
@@ -886,7 +914,7 @@ function Index() {
         else if (ev.category === "proyecto") colorId = "5"; // Amarillo (Proyectos)
 
         const eventPayload = {
-          summary: cleanTitle,
+          summary: eventSummary,
           description: descriptionLines.join("\n\n"),
           start: {
             dateTime: ev.start.toISOString(),
@@ -992,6 +1020,7 @@ function Index() {
       const endStr = toICSDate(ev.end);
       const uid = `${ev.id}@syllabot.app`;
       const cleanTitle = ev.title.replace(/ ⚠️/g, "");
+      const eventSummary = courseName.trim() ? `${cleanTitle} - ${courseName.trim()}` : cleanTitle;
 
       icsContent.push(
         "BEGIN:VEVENT",
@@ -999,7 +1028,7 @@ function Index() {
         `DTSTAMP:${toICSDate(new Date())}`,
         `DTSTART:${startStr}`,
         `DTEND:${endStr}`,
-        `SUMMARY:${cleanTitle}`,
+        `SUMMARY:${eventSummary}`,
         `DESCRIPTION:Evaluación extraída por Syllabot - UNMSM. ${ev.description || ""}`,
         "STATUS:CONFIRMED",
         "BEGIN:VALARM",
@@ -1304,6 +1333,25 @@ function Index() {
             ) : phase === "success" ? (
               /* ── Panel de Revisión Editable de Eventos ── */
               <div className="flex flex-col gap-4 w-full">
+                {/* Asignatura / Curso editable */}
+                <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                      <BookOpen size={14} /> Asignatura / Curso:
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Se exportará como: Examen Final - {courseName || "Nombre del Curso"}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={courseName}
+                    onChange={(e) => setCourseName(e.target.value)}
+                    placeholder="Ej. Procesos Estocásticos"
+                    className="w-full text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-lg border border-border/80 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-foreground">Revisión de Evaluaciones</h2>

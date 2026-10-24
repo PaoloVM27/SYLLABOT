@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
@@ -298,8 +299,12 @@ export function LoginScreen() {
         <p>&copy; 2026 Syllabot. Todos los derechos reservados.</p>
 
         <div className="flex items-center gap-5">
-          <span className="hover:text-white/70 transition-colors cursor-pointer">Privacidad</span>
-          <span className="hover:text-white/70 transition-colors cursor-pointer">Términos</span>
+          <Link to="/privacy" className="hover:text-white/70 transition-colors">
+            Privacidad
+          </Link>
+          <Link to="/terms" className="hover:text-white/70 transition-colors">
+            Términos
+          </Link>
           <span className="hover:text-white/70 transition-colors cursor-pointer">
             ¿Necesitas ayuda?
           </span>
