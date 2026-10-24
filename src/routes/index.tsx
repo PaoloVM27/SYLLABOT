@@ -218,47 +218,6 @@ function MascotBubble({ phase, progress }: { phase: Phase; progress?: number }) 
   );
 }
 
-/* ── Stepper de Progreso Adaptable a Móvil y Desktop ── */
-function FlowStepper({ phase }: { phase: Phase }) {
-  const steps = [
-    { key: "upload", label: "1. Subir Sílabo", short: "1. Subir" },
-    { key: "analyze", label: "2. Procesar IA", short: "2. IA" },
-    { key: "review", label: "3. Revisar Eventos", short: "3. Revisar" },
-    { key: "export", label: "4. Exportar", short: "4. Exportar" },
-  ];
-
-  let currentIdx = 0;
-  if (phase === "loading") currentIdx = 1;
-  else if (phase === "success") currentIdx = 2;
-
-  return (
-    <div className="w-full bg-muted/40 border border-border/80 rounded-2xl p-1.5 sm:p-2.5 mb-6 sm:mb-8">
-      <div className="grid grid-cols-4 gap-1 sm:gap-2 text-center">
-        {steps.map((st, i) => {
-          const isDone = i < currentIdx;
-          const isCurrent = i === currentIdx;
-          return (
-            <div
-              key={st.key}
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-2 rounded-xl text-[10px] sm:text-xs font-semibold transition-all ${
-                isCurrent
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : isDone
-                    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-                    : "text-muted-foreground/60"
-              }`}
-            >
-              {isDone && <Check size={11} className="stroke-[3] shrink-0" />}
-              <span className="hidden sm:inline truncate">{st.label}</span>
-              <span className="sm:hidden truncate">{st.short}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* ── Helper para formatear bytes ── */
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -1418,9 +1377,6 @@ function Index() {
             Sube tu sílabo y nuestra IA extraerá todas las fechas de evaluaciones para que puedas
             revisarlas y exportarlas a tu Google Calendar.
           </p>
-
-          {/* Stepper de Progreso */}
-          <FlowStepper phase={phase} />
 
           {/* Mascot + Speech Bubble */}
           <MascotBubble phase={phase} progress={analysisProgress} />
