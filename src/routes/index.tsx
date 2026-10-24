@@ -573,6 +573,8 @@ function Index() {
       setEditingId(null);
       setEditTitle("");
       setEditDate("");
+      setCourseName("");
+      sessionStorage.clear();
       await logout();
       toast.success("Has cerrado sesión exitosamente");
     } catch (err) {
@@ -868,22 +870,39 @@ function Index() {
     setIsSyncingCalendar(true);
     const syncToastId = toast.loading("Conectando con Google Calendar...");
 
+    const cachedTokenKey = user?.uid ? `gcal_token_${user.uid}` : "gcal_token";
+    const cachedExpiryKey = user?.uid ? `gcal_token_exp_${user.uid}` : "gcal_token_exp";
+
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope("https://www.googleapis.com/auth/calendar.events");
-      if (user?.email) {
-        provider.setCustomParameters({
-          login_hint: user.email,
-          prompt: "consent",
-        });
-      }
+      let accessToken: string | undefined;
 
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      const accessToken = credential?.accessToken;
+      // 1. Verificar si ya otorgó permiso previamente y tenemos token activo en memoria
+      const cachedToken = sessionStorage.getItem(cachedTokenKey);
+      const cachedExpiry = sessionStorage.getItem(cachedExpiryKey);
 
-      if (!accessToken) {
-        throw new Error("No se pudo obtener el token de acceso de Google Calendar.");
+      if (cachedToken && cachedExpiry && Date.now() < Number(cachedExpiry)) {
+        accessToken = cachedToken;
+      } else {
+        // Primera vez o sesión vencida (>1 hora): Solicitar permiso una sola vez
+        const provider = new GoogleAuthProvider();
+        provider.addScope("https://www.googleapis.com/auth/calendar.events");
+        if (user?.email) {
+          provider.setCustomParameters({
+            login_hint: user.email,
+          });
+        }
+
+        const result = await signInWithPopup(auth, provider);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        accessToken = credential?.accessToken;
+
+        if (!accessToken) {
+          throw new Error("No se pudo obtener el token de acceso de Google Calendar.");
+        }
+
+        // Guardar token en sessionStorage (válido por 50 minutos)
+        sessionStorage.setItem(cachedTokenKey, accessToken);
+        sessionStorage.setItem(cachedExpiryKey, (Date.now() + 50 * 60 * 1000).toString());
       }
 
       toast.loading(`Sincronizando ${activeEvents.length} evaluaciones con tu Google Calendar...`, {
@@ -947,10 +966,17 @@ function Index() {
         );
 
         if (!response.ok) {
+          if (response.status === 401) {
+            sessionStorage.removeItem(cachedTokenKey);
+            sessionStorage.removeItem(cachedExpiryKey);
+            throw new Error(
+              "La sesión de Google Calendar expiró. Vuelve a hacer clic para autorizar.",
+            );
+          }
           const errBody = await response.json().catch(() => null);
           console.error("Error al crear evento en Google Calendar:", errBody);
           throw new Error(
-            errBody?.error?.message || `Error al guardar "${cleanTitle}" en Google Calendar.`,
+            errBody?.error?.message || `Error al guardar "${eventSummary}" en Google Calendar.`,
           );
         }
         successCount++;
