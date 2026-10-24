@@ -195,10 +195,10 @@ function MascotBubble({ phase, progress }: { phase: Phase; progress?: number }) 
   const config = MASCOT_CONFIG[phase];
   let message = config.message;
   if (phase === "loading" && typeof progress === "number") {
-    if (progress < 30) message = "Extrayendo el texto de tu sílabo...";
-    else if (progress < 65) message = `Analizando evaluaciones con IA... ${progress}%`;
-    else if (progress < 95) message = `Sanitizando cronograma... ${progress}%`;
-    else message = "¡Listo! Generando tu calendario...";
+    if (progress < 25) message = "Extrayendo el texto de tu sílabo...";
+    else if (progress < 60) message = "Analizando evaluaciones y fechas con IA...";
+    else if (progress < 95) message = "Organizando exámenes, prácticas y ponderaciones...";
+    else message = "¡Casi listo! Generando tu calendario...";
   }
 
   return (
@@ -710,16 +710,17 @@ function Index() {
     setEvents([]);
     setAnalysisProgress(5);
 
-    // Animación de carga porcentual según el progreso del análisis
+    // Animación de carga continua y suave sin estancarse
     const progressInterval = setInterval(() => {
       setAnalysisProgress((prev) => {
-        if (prev < 25) return prev + Math.floor(Math.random() * 3 + 2); // 5 -> 25 (subiendo archivo)
-        if (prev < 60) return prev + Math.floor(Math.random() * 2 + 1); // 25 -> 60 (extrayendo cronograma)
-        if (prev < 85) return prev + 1; // 60 -> 85 (IA procesando evaluaciones)
-        if (prev < 92) return Math.min(92, prev + 1); // 85 -> 92 (esperando respuesta final)
+        if (prev < 25) return prev + 1; // 5 -> 25 (inicio y lectura: ~3s a 150ms)
+        if (prev < 60) return prev + 1; // 25 -> 60 (análisis con IA: ~5s)
+        if (prev < 80) return Math.random() > 0.35 ? prev + 1 : prev; // 60 -> 80 (procesando cronograma: ~4.5s)
+        if (prev < 92) return Math.random() > 0.55 ? prev + 1 : prev; // 80 -> 92 (extrayendo fechas: ~4s)
+        if (prev < 98) return Math.random() > 0.75 ? prev + 1 : prev; // 92 -> 98 (micro-avance continuo: nunca se congela)
         return prev;
       });
-    }, 110);
+    }, 150);
 
     try {
       const formData = new FormData();
@@ -1507,15 +1508,15 @@ function Index() {
                         <p className="text-base sm:text-lg font-bold text-foreground">
                           {analysisProgress < 25 && "Extrayendo texto del sílabo..."}
                           {analysisProgress >= 25 &&
-                            analysisProgress < 65 &&
+                            analysisProgress < 60 &&
                             "Analizando cronograma con IA..."}
-                          {analysisProgress >= 65 &&
-                            analysisProgress < 95 &&
+                          {analysisProgress >= 60 &&
+                            analysisProgress < 100 &&
                             "Sanitizando exámenes y prácticas..."}
-                          {analysisProgress >= 95 && "¡Análisis completado al 100%!"}
+                          {analysisProgress === 100 && "¡Análisis completado al 100%!"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {analysisProgress < 95
+                          {analysisProgress < 100
                             ? "Identificando parciales, finales y entregables"
                             : "Generando tu calendario semestral..."}
                         </p>
@@ -1589,7 +1590,7 @@ function Index() {
                   {phase === "loading" ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="size-5 animate-spin" />
-                      <span>Analizando sílabo ({analysisProgress}%)</span>
+                      <span>Analizando sílabo...</span>
                     </div>
                   ) : (
                     <>
