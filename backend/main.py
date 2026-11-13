@@ -183,14 +183,11 @@ async def process_pdf(contents: bytes, use_ai: bool, report=None):
     pdf_seconds = monotonic() - started
     progress(65, "Texto del PDF leído. Detectando evaluaciones...")
     fallback = await anyio.to_thread.run_sync(extract_without_ai, text, limiter=pdf_slots)
-    progress(75, "Extracción base completada. Consultando a Gemini...")
+    progress(75, "Analizando evaluaciones y fechas...")
     parsed, reason = await enhance_with_ai(text, fallback) if use_ai else (fallback, "disabled")
-    progress(90, "Respuesta de IA recibida. Organizando fechas..." if reason == "ok"
-             else "Usando extracción sin IA. Organizando fechas...")
+    progress(90, "Organizando evaluaciones y fechas...")
     evaluations = finalize(parsed)
     warnings = []
-    if reason != "ok":
-        warnings.append("Se utilizó extracción sin IA. Revisa las evaluaciones antes de exportar.")
     if any(ev["fecha"] == "0000-00-00" for ev in evaluations):
         warnings.append("Hay evaluaciones sin fecha suficiente en el documento; quedaron por confirmar.")
     if any(ev["fecha_origen"] == "calculada" for ev in evaluations):

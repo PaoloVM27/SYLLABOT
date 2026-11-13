@@ -25,9 +25,9 @@ export function analysisPresentation(progress: number, elapsedSeconds = 0) {
   }
   if (progress >= 75) {
     return {
-      title: "Analizando cronograma con IA...",
+      title: "Analizando cronograma...",
       description: "Identificando parciales, finales y entregables",
-      message: "Analizando evaluaciones y fechas con IA...",
+      message: "Analizando evaluaciones y fechas...",
       image: "/syllabot_04_pensando.png",
     };
   }

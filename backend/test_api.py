@@ -71,7 +71,8 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             response = await self.upload(headers={"Accept": "application/x-ndjson"})
         events = [json.loads(line) for line in response.text.splitlines()]
         self.assertEqual(events[-1]["data"]["metodo"], "reglas")
-        self.assertTrue(any("sin IA" in e.get("message", "") for e in events))
+        self.assertFalse(any("sin IA" in e.get("message", "") for e in events))
+        self.assertFalse(any("sin IA" in warning for warning in events[-1]["data"]["advertencias"]))
         generate.assert_awaited_once()
 
     async def test_stream_reports_pdf_error_without_result_or_completion(self):

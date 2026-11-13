@@ -366,7 +366,6 @@ function Index() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const loadingPresentation = analysisPresentation(analysisProgress, elapsedSeconds);
   const [analysisWarnings, setAnalysisWarnings] = useState<string[]>([]);
-  const [extractionMethod, setExtractionMethod] = useState("");
   const uploadController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -508,8 +507,11 @@ function Index() {
       controller.signal.throwIfAborted();
       const detectedCourse = deriveCourseName(selectedFile.name, data.curso);
       setCourseName(detectedCourse);
-      setAnalysisWarnings(data.advertencias || []);
-      setExtractionMethod(data.metodo === "reglas" ? "Extracción sin IA" : "Extracción con IA");
+      setAnalysisWarnings(
+        (data.advertencias || []).filter(
+          (warning) => !warning.startsWith("Se utilizó extracción sin IA."),
+        ),
+      );
 
       let minDate = new Date();
       const rawEvaluaciones: RawEval[] = data.evaluaciones || [];
@@ -1422,7 +1424,6 @@ function Index() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-foreground">Revisión de Evaluaciones</h2>
-                    <p className="text-xs text-muted-foreground">{extractionMethod}</p>
                     <p className="text-xs text-muted-foreground">
                       {activeEventsCount} de {events.length} seleccionadas para el calendario
                     </p>
