@@ -38,6 +38,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { prepareSyllabusService, uploadSyllabus } from "@/lib/syllabus-api";
+import { analysisPresentation } from "@/lib/analysis-presentation";
 import {
   Dialog,
   DialogContent,
@@ -191,23 +193,29 @@ const MASCOT_CONFIG: Record<Phase, { src: string; message: string }> = {
   },
 };
 
-function MascotBubble({ phase, progress }: { phase: Phase; progress?: number }) {
-  const config = MASCOT_CONFIG[phase];
-  let message = config.message;
-  if (phase === "loading" && typeof progress === "number") {
-    if (progress < 25) message = "Extrayendo el texto de tu sílabo...";
-    else if (progress < 60) message = "Analizando evaluaciones y fechas con IA...";
-    else if (progress < 95) message = "Organizando exámenes, prácticas y ponderaciones...";
-    else message = "¡Casi listo! Generando tu calendario...";
-  }
-
+function MascotBubble({
+  phase,
+  progress = 0,
+  elapsed = 0,
+}: {
+  phase: Phase;
+  progress?: number;
+  elapsed?: number;
+}) {
+  const presentation = analysisPresentation(progress, elapsed);
+  const config =
+    phase === "loading"
+      ? { src: presentation.image, message: presentation.message }
+      : MASCOT_CONFIG[phase];
+  const message = config.message;
   return (
     <div className="flex items-end gap-2.5 sm:gap-3.5 mb-6 justify-start">
       <div className="relative shrink-0">
         <img
+          key={config.src}
           src={config.src}
           alt="Syllabot mascota"
-          className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md"
+          className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md animate-in fade-in duration-300"
         />
       </div>
       <div className="relative bg-card border border-border rounded-2xl rounded-bl-sm px-3.5 py-2.5 sm:px-4 sm:py-3 max-w-[240px] sm:max-w-xs shadow-sm">
@@ -284,218 +292,6 @@ interface RawEval {
   semana?: number;
 }
 
-interface NormalizedEval {
-  nombre: string;
-  fecha: string;
-  peso: number;
-  semana: number;
-}
-
-function sanitizeEvaluacionesFrontend(rawList: RawEval[]): RawEval[] {
-  if (!rawList || rawList.length === 0) return [];
-
-  const cleaned: NormalizedEval[] = [];
-  for (const e of rawList) {
-    const nombre = (e.nombre || "").trim();
-    if (nombre.length > 0) {
-      cleaned.push({
-        nombre,
-        fecha: e.fecha || "0000-00-00",
-        peso: typeof e.peso === "number" ? e.peso : 0,
-        semana: typeof e.semana === "number" ? e.semana : 0,
-      });
-    }
-  }
-
-  const parcialCandidates: NormalizedEval[] = [];
-  const finalCandidates: NormalizedEval[] = [];
-  const practicaCandidates: NormalizedEval[] = [];
-  const proyectoCandidates: NormalizedEval[] = [];
-  const otrosCandidates: NormalizedEval[] = [];
-
-  for (const ev of cleaned) {
-    const n = ev.nombre.toLowerCase();
-    const isProyecto = /\b(proyecto|avance|entregable|sustentaci[oó]n|informe)\b/i.test(n);
-    const isPractica = /(pr[aá]ctica\s+calificad[ao]|\bpc\b|\bpc\s*\d|\bpr[aá]ctica\s*\d)/i.test(n);
-    const isParcial = /\b(parcial|ep)\b/i.test(n) && !isProyecto;
-    const isFinal = /\b(final|ef)\b/i.test(n) && !isProyecto && !isParcial;
-
-    if (isParcial) {
-      parcialCandidates.push(ev);
-    } else if (isFinal) {
-      finalCandidates.push(ev);
-    } else if (isPractica) {
-      practicaCandidates.push(ev);
-    } else if (isProyecto) {
-      proyectoCandidates.push(ev);
-    } else {
-      otrosCandidates.push(ev);
-    }
-  }
-
-  const result: NormalizedEval[] = [];
-
-  // 1. Regla: Máximo 1 Examen Parcial (cercano a semana 8)
-  if (parcialCandidates.length > 0) {
-    const firstParcial = parcialCandidates[0];
-    if (firstParcial) {
-      let bestParcial = firstParcial;
-      for (const curr of parcialCandidates) {
-        const prevDiff = bestParcial.semana > 0 ? Math.abs(bestParcial.semana - 8) : 99;
-        const currDiff = curr.semana > 0 ? Math.abs(curr.semana - 8) : 99;
-        if (currDiff < prevDiff) {
-          bestParcial = curr;
-        }
-      }
-      result.push({ ...bestParcial, nombre: "Examen Parcial" });
-    }
-  }
-
-  // 2. Regla: Máximo 1 Examen Final (nunca en semana 8 ni misma fecha que parcial)
-  if (finalCandidates.length > 0) {
-    const validFinals = finalCandidates.filter((f) => {
-      if (
-        result.some(
-          (r) => r.nombre === "Examen Parcial" && r.fecha === f.fecha && f.fecha !== "0000-00-00",
-        )
-      ) {
-        return false;
-      }
-      if (f.semana > 0 && f.semana <= 8) return false;
-      return true;
-    });
-
-    const pool =
-      validFinals.length > 0
-        ? validFinals
-        : !result.some((r) => r.nombre === "Examen Parcial")
-          ? finalCandidates
-          : [];
-
-    if (pool.length > 0) {
-      const firstFinal = pool[0];
-      if (firstFinal) {
-        let bestFinal = firstFinal;
-        for (const curr of pool) {
-          if (curr.semana > bestFinal.semana || curr.fecha > bestFinal.fecha) {
-            bestFinal = curr;
-          }
-        }
-        result.push({ ...bestFinal, nombre: "Examen Final" });
-      }
-    }
-  }
-
-  // 3. Regla: Prácticas Calificadas (Máximo 2 o menos)
-  if (practicaCandidates.length > 0) {
-    practicaCandidates.sort((a, b) => {
-      if (a.semana !== b.semana) return a.semana - b.semana;
-      return a.fecha.localeCompare(b.fecha);
-    });
-    const uniquePcs: NormalizedEval[] = [];
-    const seenPcs = new Set<string>();
-    for (const pc of practicaCandidates) {
-      const key = `${pc.semana}-${pc.fecha}`;
-      if (!seenPcs.has(key) || key === "0-0000-00-00") {
-        uniquePcs.push(pc);
-        if (key !== "0-0000-00-00") seenPcs.add(key);
-      }
-    }
-    const selectedPcs = uniquePcs.slice(0, 2);
-    for (let i = 0; i < selectedPcs.length; i++) {
-      const pc = selectedPcs[i];
-      if (pc) {
-        result.push({
-          ...pc,
-          nombre: `Práctica Calificada ${i + 1}`,
-        });
-      }
-    }
-  }
-
-  // 4. Regla: Proyectos y Entregables (semana 15 es Presentación de Proyecto Final)
-  if (proyectoCandidates.length > 0) {
-    proyectoCandidates.sort((a, b) => {
-      if (a.semana !== b.semana) return a.semana - b.semana;
-      return a.fecha.localeCompare(b.fecha);
-    });
-
-    let uniqueProjs: NormalizedEval[] = [];
-    const seenProj = new Set<string>();
-    for (const pr of proyectoCandidates) {
-      const key = `${pr.semana}-${pr.fecha}`;
-      if (!seenProj.has(key) || key === "0-0000-00-00") {
-        uniqueProjs.push(pr);
-        if (key !== "0-0000-00-00") seenProj.add(key);
-      }
-    }
-
-    if (uniqueProjs.some((p) => p.semana === 15) && uniqueProjs.some((p) => p.semana === 16)) {
-      uniqueProjs = uniqueProjs.filter((p) => p.semana !== 16);
-    }
-
-    const ordinals: Record<number, string> = {
-      1: "1er",
-      2: "2do",
-      3: "3er",
-      4: "4to",
-      5: "5to",
-      6: "6to",
-      7: "7mo",
-      8: "8vo",
-    };
-
-    if (uniqueProjs.length === 1) {
-      const p = uniqueProjs[0];
-      if (p) {
-        const isFinal = p.semana >= 14 || p.semana === 0;
-        result.push({
-          ...p,
-          nombre: isFinal ? "Presentación de Proyecto Final" : "1er Entregable de Proyecto",
-        });
-      }
-    } else if (uniqueProjs.length > 1) {
-      let finalIdx = uniqueProjs.findIndex((p) => p.semana === 15);
-      const lastProj = uniqueProjs[uniqueProjs.length - 1];
-      if (finalIdx === -1 && lastProj && lastProj.semana >= 14) {
-        finalIdx = uniqueProjs.length - 1;
-      }
-
-      let entregableCount = 1;
-      for (let idx = 0; idx < uniqueProjs.length; idx++) {
-        const p = uniqueProjs[idx];
-        if (!p) continue;
-        if (idx === finalIdx) {
-          result.push({ ...p, nombre: "Presentación de Proyecto Final" });
-        } else {
-          const ordStr = ordinals[entregableCount] ?? `${entregableCount}°`;
-          result.push({ ...p, nombre: `${ordStr} Entregable de Proyecto` });
-          entregableCount++;
-        }
-      }
-    }
-  }
-
-  // 5. Otros Hitos
-  for (const ot of otrosCandidates) {
-    if (!result.some((r) => r.nombre === ot.nombre && r.fecha === ot.fecha)) {
-      result.push(ot);
-    }
-  }
-
-  result.sort((a, b) => {
-    if (a.semana > 0 && b.semana > 0 && a.semana !== b.semana) {
-      return a.semana - b.semana;
-    }
-    if (a.fecha !== "0000-00-00" && b.fecha !== "0000-00-00") {
-      return a.fecha.localeCompare(b.fecha);
-    }
-    return 0;
-  });
-
-  return result;
-}
-
 function MarqueeFileName({ name }: { name: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
@@ -566,6 +362,29 @@ function Index() {
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [courseName, setCourseName] = useState("");
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisMessage, setAnalysisMessage] = useState("Conectando con el servicio...");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const loadingPresentation = analysisPresentation(analysisProgress, elapsedSeconds);
+  const [analysisWarnings, setAnalysisWarnings] = useState<string[]>([]);
+  const [extractionMethod, setExtractionMethod] = useState("");
+  const uploadController = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (user) void prepareSyllabusService().catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (phase !== "loading") return;
+    const started = Date.now();
+    setElapsedSeconds(0);
+    const timer = window.setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, [phase]);
+
+  useEffect(() => () => uploadController.current?.abort(), []);
   const [isCalendarAuthorized, setIsCalendarAuthorized] = useState(false);
   const [successModalData, setSuccessModalData] = useState<{
     open: boolean;
@@ -610,6 +429,8 @@ function Index() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = async () => {
+    uploadController.current?.abort();
+    uploadController.current = null;
     try {
       setEvents([]);
       setSelectedFile(null);
@@ -620,7 +441,7 @@ function Index() {
       setEditTitle("");
       setEditDate("");
       setCourseName("");
-      setAnalysisProgress(0);
+      setAnalysisWarnings([]);
       setIsCalendarAuthorized(false);
       setSuccessModalData({ open: false, count: 0, courseName: "" });
       sessionStorage.clear();
@@ -633,10 +454,15 @@ function Index() {
   };
 
   const acceptFile = useCallback((file: File) => {
-    const validExtensions = [".pdf", ".doc", ".docx"];
+    if (uploadController.current) return;
+    const validExtensions = [".pdf"];
     const isVal = validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
     if (!isVal) {
-      toast.error("Formato no compatible. Por favor sube un archivo PDF o Word (.docx)");
+      toast.error("Formato no compatible. Por favor sube un archivo PDF.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("El PDF supera el límite de 10 MB.");
       return;
     }
     setSelectedFile(file);
@@ -667,53 +493,26 @@ function Index() {
     setPhase("loading");
     setErrorMessage("");
     setEvents([]);
-    setAnalysisProgress(5);
-
-    // Animación de carga continua y suave sin estancarse
-    const progressInterval = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        if (prev < 25) return prev + 1; // 5 -> 25 (inicio y lectura: ~3s a 150ms)
-        if (prev < 60) return prev + 1; // 25 -> 60 (análisis con IA: ~5s)
-        if (prev < 80) return Math.random() > 0.35 ? prev + 1 : prev; // 60 -> 80 (procesando cronograma: ~4.5s)
-        if (prev < 92) return Math.random() > 0.55 ? prev + 1 : prev; // 80 -> 92 (extrayendo fechas: ~4s)
-        if (prev < 98) return Math.random() > 0.75 ? prev + 1 : prev; // 92 -> 98 (micro-avance continuo: nunca se congela)
-        return prev;
-      });
-    }, 150);
+    setAnalysisWarnings([]);
+    setAnalysisProgress(0);
+    setAnalysisMessage("Enviando el PDF y esperando al servidor...");
+    const controller = new AbortController();
+    uploadController.current = controller;
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      const API_URL = (import.meta.env["VITE_API_URL"] as string) || "http://localhost:8000";
-      const res = await fetch(`${API_URL}/upload`, {
-        method: "POST",
-        body: formData,
+      const data = await uploadSyllabus(selectedFile, controller.signal, (progress) => {
+        if (controller.signal.aborted) return;
+        setAnalysisProgress(progress.percent);
+        setAnalysisMessage(progress.message);
       });
-
-      if (!res.ok) {
-        let detail = `Error ${res.status}`;
-        try {
-          const errJson = await res.json();
-          detail = errJson.detail ?? detail;
-        } catch {
-          const text = await res.text().catch(() => "");
-          detail = text.slice(0, 200) || detail;
-        }
-        throw new Error(detail);
-      }
-
-      const data = await res.json();
+      controller.signal.throwIfAborted();
       const detectedCourse = deriveCourseName(selectedFile.name, data.curso);
       setCourseName(detectedCourse);
-
-      // Cuando la IA termina, avanzamos al 100%
-      clearInterval(progressInterval);
-      setAnalysisProgress(100);
-      await new Promise((resolve) => setTimeout(resolve, 450));
+      setAnalysisWarnings(data.advertencias || []);
+      setExtractionMethod(data.metodo === "reglas" ? "Extracción sin IA" : "Extracción con IA");
 
       let minDate = new Date();
-      const rawEvaluaciones: RawEval[] = sanitizeEvaluacionesFrontend(data.evaluaciones || []);
+      const rawEvaluaciones: RawEval[] = data.evaluaciones || [];
       const exactDates = rawEvaluaciones.filter(
         (e): e is RawEval & { fecha: string } =>
           Boolean(e.fecha) && e.fecha !== "0000-00-00" && !e.fecha!.includes("0000"),
@@ -767,22 +566,34 @@ function Index() {
 
       setEvents(parsedEvents);
       setCurrentDate(vagueDate);
+      setAnalysisProgress(100);
+      setAnalysisMessage("¡Calendario listo!");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      controller.signal.throwIfAborted();
       setPhase("success");
 
       toast.success(
         `¡Análisis completado! Se detectaron ${parsedEvents.length} evaluaciones clave.`,
       );
     } catch (err) {
-      clearInterval(progressInterval);
-      setAnalysisProgress(0);
-      const msg = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+      if (controller.signal.aborted) return;
+      const msg =
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "El servidor tardó demasiado en responder. Intenta nuevamente en unos momentos."
+          : err instanceof Error
+            ? err.message
+            : "Error al conectar con el servidor.";
       setErrorMessage(msg);
       setPhase("error");
       toast.error(msg);
+    } finally {
+      if (uploadController.current === controller) uploadController.current = null;
     }
   };
 
   const reset = () => {
+    uploadController.current?.abort();
+    uploadController.current = null;
     setPhase("idle");
     setFileName("");
     setErrorMessage("");
@@ -793,7 +604,7 @@ function Index() {
     setEditTitle("");
     setEditDate("");
     setCourseName("");
-    setAnalysisProgress(0);
+    setAnalysisWarnings([]);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -1379,7 +1190,7 @@ function Index() {
           </p>
 
           {/* Mascot + Speech Bubble */}
-          <MascotBubble phase={phase} progress={analysisProgress} />
+          <MascotBubble phase={phase} progress={analysisProgress} elapsed={elapsedSeconds} />
 
           <div className="w-full">
             {phase === "idle" || phase === "file" || phase === "loading" ? (
@@ -1400,7 +1211,7 @@ function Index() {
                   <input
                     ref={inputRef}
                     type="file"
-                    accept=".pdf,.doc,.docx"
+                    accept=".pdf,application/pdf"
                     className="hidden"
                     disabled={phase === "loading"}
                     onChange={(e) => {
@@ -1410,20 +1221,33 @@ function Index() {
                   />
 
                   {phase === "loading" ? (
-                    <div className="w-full flex flex-col items-center justify-center py-2 animate-in fade-in duration-300">
-                      {/* Anillo de Carga Circular con Porcentaje en el Centro */}
-                      <div className="relative size-24 sm:size-28 flex items-center justify-center">
-                        <svg className="size-full -rotate-90" viewBox="0 0 100 100">
-                          {/* Círculo de fondo */}
+                    <div
+                      className="w-full flex flex-col items-center justify-center py-2 animate-in fade-in duration-300"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div
+                        className="relative size-24 sm:size-28 flex items-center justify-center mb-4"
+                        role="progressbar"
+                        aria-label="Etapas del procesamiento completadas"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={analysisProgress}
+                        aria-valuetext={`${analysisProgress}%: ${analysisMessage}`}
+                      >
+                        <svg
+                          className="size-full -rotate-90"
+                          viewBox="0 0 100 100"
+                          aria-hidden="true"
+                        >
                           <circle
                             cx="50"
                             cy="50"
                             r="40"
-                            className="stroke-muted/30"
+                            className={`stroke-primary/10 ${analysisProgress === 0 ? "animate-pulse" : ""}`}
                             strokeWidth="8"
-                            fill="transparent"
+                            fill="none"
                           />
-                          {/* Círculo de progreso animado */}
                           <circle
                             cx="50"
                             cy="50"
@@ -1431,7 +1255,7 @@ function Index() {
                             stroke="url(#analysis-gradient)"
                             strokeWidth="8"
                             strokeLinecap="round"
-                            fill="transparent"
+                            fill="none"
                             strokeDasharray={251.32}
                             strokeDashoffset={251.32 - (251.32 * analysisProgress) / 100}
                             className="transition-all duration-300 ease-out"
@@ -1450,41 +1274,46 @@ function Index() {
                             </linearGradient>
                           </defs>
                         </svg>
-
-                        {/* Porcentaje en el Centro */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                          <span className="font-space text-2xl sm:text-3xl font-black text-foreground tracking-tight">
-                            {analysisProgress}%
-                          </span>
-                        </div>
+                        <span className="absolute font-space text-2xl sm:text-3xl font-black text-foreground">
+                          {analysisProgress}%
+                        </span>
                       </div>
-
-                      {/* Mensaje dinámico según el porcentaje de avance */}
-                      <div className="text-center mt-4 max-w-xs space-y-1">
+                      <div className="text-center max-w-xs space-y-1">
                         <p className="text-base sm:text-lg font-bold text-foreground">
-                          {analysisProgress < 25 && "Extrayendo texto del sílabo..."}
-                          {analysisProgress >= 25 &&
-                            analysisProgress < 60 &&
-                            "Analizando cronograma con IA..."}
-                          {analysisProgress >= 60 &&
-                            analysisProgress < 100 &&
-                            "Sanitizando exámenes y prácticas..."}
-                          {analysisProgress === 100 && "¡Análisis completado al 100%!"}
+                          {loadingPresentation.title}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {analysisProgress < 100
-                            ? "Identificando parciales, finales y entregables"
-                            : "Generando tu calendario semestral..."}
+                          {loadingPresentation.description}
                         </p>
                       </div>
-
-                      {/* Mini barra de progreso lineal de soporte */}
-                      <div className="w-48 sm:w-56 h-1.5 bg-muted/60 rounded-full mt-3 overflow-hidden">
+                      <div
+                        className="w-48 sm:w-56 h-1.5 bg-muted/60 rounded-full mt-3 overflow-hidden"
+                        aria-hidden="true"
+                      >
                         <div
-                          className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 rounded-full transition-all duration-300 ease-out"
+                          className="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 rounded-full transition-all duration-300"
                           style={{ width: `${analysisProgress}%` }}
                         />
                       </div>
+                      <p className="text-[11px] text-muted-foreground mt-3 min-h-4">
+                        {analysisProgress > 5 && analysisProgress < 65
+                          ? analysisMessage
+                          : elapsedSeconds >= 15
+                            ? `${elapsedSeconds} s transcurridos`
+                            : ""}
+                      </p>
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors mt-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          uploadController.current?.abort();
+                          uploadController.current = null;
+                          setPhase("file");
+                        }}
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   ) : phase === "file" && selectedFile ? (
                     <div className="w-full flex flex-col items-center">
@@ -1530,7 +1359,7 @@ function Index() {
                           Arrastra tu sílabo aquí o haz clic
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Formatos compatibles: PDF, Word (.docx) &bull; Máx. 10MB
+                          PDF con texto seleccionable &bull; Máx. 10 MB / 50 páginas
                         </p>
                       </div>
                     </>
@@ -1559,6 +1388,18 @@ function Index() {
             ) : phase === "success" ? (
               /* ── Panel de Revisión Editable de Eventos ── */
               <div className="flex flex-col gap-4 w-full">
+                {analysisWarnings.length > 0 && (
+                  <div
+                    role="status"
+                    className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                  >
+                    {analysisWarnings.map((warning) => (
+                      <p key={warning} className="mb-1 last:mb-0">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {/* Asignatura / Curso editable */}
                 <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20">
                   <div className="flex items-center justify-between gap-2">
@@ -1581,6 +1422,7 @@ function Index() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-foreground">Revisión de Evaluaciones</h2>
+                    <p className="text-xs text-muted-foreground">{extractionMethod}</p>
                     <p className="text-xs text-muted-foreground">
                       {activeEventsCount} de {events.length} seleccionadas para el calendario
                     </p>
