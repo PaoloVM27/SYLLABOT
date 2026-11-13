@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Settings,
   BookOpen,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { LoginScreen } from "@/auth/LoginScreen";
@@ -1390,18 +1391,6 @@ function Index() {
             ) : phase === "success" ? (
               /* ── Panel de Revisión Editable de Eventos ── */
               <div className="flex flex-col gap-4 w-full">
-                {analysisWarnings.length > 0 && (
-                  <div
-                    role="status"
-                    className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-                  >
-                    {analysisWarnings.map((warning) => (
-                      <p key={warning} className="mb-1 last:mb-0">
-                        {warning}
-                      </p>
-                    ))}
-                  </div>
-                )}
                 {/* Asignatura / Curso editable */}
                 <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20">
                   <div className="flex items-center justify-between gap-2">
@@ -1684,180 +1673,198 @@ function Index() {
         </div>
 
         {/* ── Right Column: Calendar Preview Adaptable ── */}
-        <div className="flex-1 min-w-0 flex flex-col bg-card border border-border rounded-2xl shadow-sm overflow-hidden min-h-[500px] h-[580px] sm:h-[640px] lg:h-[720px] w-full">
-          {/* Calendar Header */}
-          <div className="p-4 sm:px-6 sm:py-3.5 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-            <div>
-              <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
-                <CalendarIcon className="text-primary" size={18} /> Vista Previa del Semestre
-              </h3>
-              {events.length > 0 && (
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Mostrando {activeEventsCount} evaluaciones seleccionadas
-                </p>
-              )}
-            </div>
-
-            {/* Botones de Sincronización y Exportación */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-              <button
-                onClick={handleSyncGoogleCalendar}
-                disabled={activeEventsCount === 0 || isSyncingCalendar}
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 flex-1 sm:flex-none"
-                title={
-                  isCalendarAuthorized
-                    ? "Exportar directamente a tu Google Calendar institucional"
-                    : "Sincronizar y vincular tu Google Calendar institucional"
-                }
-              >
-                {isSyncingCalendar ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" />
-                    <span>{isCalendarAuthorized ? "Exportando..." : "Sincronizando..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <CalendarIcon size={15} />
-                    <span>
-                      {isCalendarAuthorized
-                        ? "Exportar a Google Calendar"
-                        : "Sincronizar con Google Calendar"}
-                    </span>
-                  </>
+        <div className="flex-1 min-w-0 w-full flex flex-col gap-3">
+          <div className="flex flex-col shrink-0 bg-card border border-border rounded-2xl shadow-sm overflow-hidden min-h-[500px] h-[580px] sm:h-[640px] lg:h-[720px] w-full">
+            {/* Calendar Header */}
+            <div className="p-4 sm:px-6 sm:py-3.5 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                  <CalendarIcon className="text-primary" size={18} /> Vista Previa del Semestre
+                </h3>
+                {events.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Mostrando {activeEventsCount} evaluaciones seleccionadas
+                  </p>
                 )}
-              </button>
-
-              <button
-                onClick={handleExportICS}
-                disabled={activeEventsCount === 0 || isSyncingCalendar}
-                className="flex items-center justify-center gap-1.5 bg-muted/80 hover:bg-muted text-foreground border border-border/80 px-3 py-2.5 sm:py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs shrink-0"
-                title="Descargar archivo .ics estándar para Apple Calendar u Outlook"
-              >
-                <Download size={14} />
-                <span>.ics</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Leyenda de Colores */}
-          {events.length > 0 && (
-            <div className="px-4 sm:px-6 py-2.5 bg-muted/30 border-b border-border/60 flex items-center gap-2.5 sm:gap-4 flex-wrap text-[11px]">
-              <span className="font-semibold text-muted-foreground">Leyenda:</span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <span className="size-2 rounded-full bg-rose-500" /> Exámenes
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <span className="size-2 rounded-full bg-indigo-500" /> Prácticas Calificadas
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <span className="size-2 rounded-full bg-emerald-500" /> Proyectos
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <span className="size-2 rounded-full bg-amber-500" /> Por Confirmar
-              </span>
-            </div>
-          )}
-
-          {/* Calendar Body */}
-          <div className="flex-1 p-4 overflow-hidden relative">
-            {/* Empty State Limpio y Centrado */}
-            {events.length === 0 ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-20 p-8 text-center bg-card">
-                <div className="relative mb-4">
-                  <img
-                    src="/syllabot_05_calendario.png"
-                    alt="Syllabot calendario"
-                    className="w-36 h-36 object-contain drop-shadow-md animate-pulse"
-                  />
-                </div>
-                <h4 className="text-lg font-bold text-foreground">Tu calendario aparecerá aquí</h4>
-                <p className="mt-1.5 text-xs text-muted-foreground max-w-sm leading-relaxed">
-                  Sube el sílabo de tu curso. Nuestra IA detectará exámenes parciales, finales,
-                  prácticas y proyectos calculando las fechas exactas del semestre.
-                </p>
-
-                {/* Badges de demostración */}
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 border border-rose-200 dark:border-rose-800">
-                    🔴 Examen Parcial
-                  </span>
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 border border-indigo-200 dark:border-indigo-800">
-                    🔵 Práctica Calificada
-                  </span>
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-200 dark:border-emerald-800">
-                    🟢 Proyecto Final
-                  </span>
-                </div>
               </div>
-            ) : (
-              <div className="h-full">
-                <Calendar
-                  localizer={localizer}
-                  events={
-                    calendarView === "month"
-                      ? calendarEvents.filter((e) => e.hasExactDate !== false)
-                      : calendarEvents
+
+              {/* Botones de Sincronización y Exportación */}
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+                <button
+                  onClick={handleSyncGoogleCalendar}
+                  disabled={activeEventsCount === 0 || isSyncingCalendar}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition-all hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 flex-1 sm:flex-none"
+                  title={
+                    isCalendarAuthorized
+                      ? "Exportar directamente a tu Google Calendar institucional"
+                      : "Sincronizar y vincular tu Google Calendar institucional"
                   }
-                  onView={(view) => setCalendarView(view)}
-                  date={currentDate}
-                  onNavigate={(newDate) => setCurrentDate(newDate)}
-                  startAccessor="start"
-                  endAccessor="end"
-                  tooltipAccessor="tooltip"
-                  eventPropGetter={eventStyleGetter}
-                  style={{ height: "100%", minHeight: 400 }}
-                  culture="es"
-                  length={150}
-                  formats={{
-                    agendaDateFormat: "dd/MM/yyyy",
-                  }}
-                  components={{
-                    agenda: {
-                      date: (props) => {
-                        const isVagueDateGroup = events.some(
-                          (e) =>
-                            e.isVagueDate &&
-                            new Date(e.vagueDateRef!).getTime() === props.day.getTime(),
-                        );
-                        if (isVagueDateGroup) {
-                          return (
-                            <span className="font-semibold text-amber-600 dark:text-amber-400">
-                              Sin especificar
-                            </span>
-                          );
-                        }
-                        return <span>{props.label}</span>;
-                      },
-                      time: (props) => {
-                        const ev = props.event as Partial<SyllabotEvent>;
-                        if (ev.isVagueDate) {
-                          return (
-                            <span className="text-muted-foreground italic">Por confirmar</span>
-                          );
-                        }
-                        return <span>{props.label}</span>;
-                      },
-                    },
-                  }}
-                  messages={{
-                    next: "Sig",
-                    previous: "Ant",
-                    today: "Hoy",
-                    month: "Mes",
-                    week: "Semana",
-                    day: "Día",
-                    agenda: "Agenda",
-                    date: "Fecha",
-                    time: "Hora",
-                    event: "Evaluación",
-                    noEventsInRange: "No hay evaluaciones en esta fecha.",
-                  }}
-                  defaultView="month"
-                  views={["month", "agenda"]}
-                />
+                >
+                  {isSyncingCalendar ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>{isCalendarAuthorized ? "Exportando..." : "Sincronizando..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <CalendarIcon size={15} />
+                      <span>
+                        {isCalendarAuthorized
+                          ? "Exportar a Google Calendar"
+                          : "Sincronizar con Google Calendar"}
+                      </span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleExportICS}
+                  disabled={activeEventsCount === 0 || isSyncingCalendar}
+                  className="flex items-center justify-center gap-1.5 bg-muted/80 hover:bg-muted text-foreground border border-border/80 px-3 py-2.5 sm:py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs shrink-0"
+                  title="Descargar archivo .ics estándar para Apple Calendar u Outlook"
+                >
+                  <Download size={14} />
+                  <span>.ics</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Leyenda de Colores */}
+            {events.length > 0 && (
+              <div className="px-4 sm:px-6 py-2.5 bg-muted/30 border-b border-border/60 flex items-center gap-2.5 sm:gap-4 flex-wrap text-[11px]">
+                <span className="font-semibold text-muted-foreground">Leyenda:</span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="size-2 rounded-full bg-rose-500" /> Exámenes
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="size-2 rounded-full bg-indigo-500" /> Prácticas Calificadas
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="size-2 rounded-full bg-emerald-500" /> Proyectos
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="size-2 rounded-full bg-amber-500" /> Por Confirmar
+                </span>
               </div>
             )}
+
+            {/* Calendar Body */}
+            <div className="flex-1 p-4 overflow-hidden relative">
+              {/* Empty State Limpio y Centrado */}
+              {events.length === 0 ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-20 p-8 text-center bg-card">
+                  <div className="relative mb-4">
+                    <img
+                      src="/syllabot_05_calendario.png"
+                      alt="Syllabot calendario"
+                      className="w-36 h-36 object-contain drop-shadow-md animate-pulse"
+                    />
+                  </div>
+                  <h4 className="text-lg font-bold text-foreground">
+                    Tu calendario aparecerá aquí
+                  </h4>
+                  <p className="mt-1.5 text-xs text-muted-foreground max-w-sm leading-relaxed">
+                    Sube el sílabo de tu curso. Nuestra IA detectará exámenes parciales, finales,
+                    prácticas y proyectos calculando las fechas exactas del semestre.
+                  </p>
+
+                  {/* Badges de demostración */}
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 border border-rose-200 dark:border-rose-800">
+                      🔴 Examen Parcial
+                    </span>
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 border border-indigo-200 dark:border-indigo-800">
+                      🔵 Práctica Calificada
+                    </span>
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-200 dark:border-emerald-800">
+                      🟢 Proyecto Final
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full">
+                  <Calendar
+                    localizer={localizer}
+                    events={
+                      calendarView === "month"
+                        ? calendarEvents.filter((e) => e.hasExactDate !== false)
+                        : calendarEvents
+                    }
+                    onView={(view) => setCalendarView(view)}
+                    date={currentDate}
+                    onNavigate={(newDate) => setCurrentDate(newDate)}
+                    startAccessor="start"
+                    endAccessor="end"
+                    tooltipAccessor="tooltip"
+                    eventPropGetter={eventStyleGetter}
+                    style={{ height: "100%", minHeight: 400 }}
+                    culture="es"
+                    length={150}
+                    formats={{
+                      agendaDateFormat: "dd/MM/yyyy",
+                    }}
+                    components={{
+                      agenda: {
+                        date: (props) => {
+                          const isVagueDateGroup = events.some(
+                            (e) =>
+                              e.isVagueDate &&
+                              new Date(e.vagueDateRef!).getTime() === props.day.getTime(),
+                          );
+                          if (isVagueDateGroup) {
+                            return (
+                              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                Sin especificar
+                              </span>
+                            );
+                          }
+                          return <span>{props.label}</span>;
+                        },
+                        time: (props) => {
+                          const ev = props.event as Partial<SyllabotEvent>;
+                          if (ev.isVagueDate) {
+                            return (
+                              <span className="text-muted-foreground italic">Por confirmar</span>
+                            );
+                          }
+                          return <span>{props.label}</span>;
+                        },
+                      },
+                    }}
+                    messages={{
+                      next: "Sig",
+                      previous: "Ant",
+                      today: "Hoy",
+                      month: "Mes",
+                      week: "Semana",
+                      day: "Día",
+                      agenda: "Agenda",
+                      date: "Fecha",
+                      time: "Hora",
+                      event: "Evaluación",
+                      noEventsInRange: "No hay evaluaciones en esta fecha.",
+                    }}
+                    defaultView="month"
+                    views={["month", "agenda"]}
+                  />
+                </div>
+              )}
+            </div>
           </div>
+          {phase === "success" && analysisWarnings.length > 0 && (
+            <aside
+              role="status"
+              aria-label="Avisos sobre las fechas del calendario"
+              className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+            >
+              <Info className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="min-w-0 space-y-1">
+                {analysisWarnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            </aside>
+          )}
         </div>
       </main>
     </div>
