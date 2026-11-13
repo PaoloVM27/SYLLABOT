@@ -41,7 +41,8 @@ import {
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { prepareSyllabusService, uploadSyllabus } from "@/lib/syllabus-api";
 import { analysisPresentation } from "@/lib/analysis-presentation";
-import { evaluationDates, scheduledEvaluations } from "@/lib/calendar-events";
+import { evaluationDates, monthNavigationDate, scheduledEvaluations } from "@/lib/calendar-events";
+import { SemesterAgenda } from "@/components/SemesterAgenda";
 import {
   Dialog,
   DialogContent,
@@ -1747,14 +1748,16 @@ function Index() {
                     view={calendarView}
                     onView={(view) => setCalendarView(view)}
                     date={currentDate}
-                    onNavigate={(newDate) => setCurrentDate(newDate)}
+                    onNavigate={(newDate, _view, action) => {
+                      setCurrentDate(monthNavigationDate(currentDate, action, newDate));
+                      setCalendarView("month");
+                    }}
                     startAccessor="start"
                     endAccessor="end"
                     tooltipAccessor="tooltip"
                     eventPropGetter={eventStyleGetter}
                     style={{ height: "100%" }}
                     culture="es"
-                    length={150}
                     formats={{
                       agendaDateFormat: "dd/MM/yyyy",
                     }}
@@ -1771,7 +1774,7 @@ function Index() {
                       event: "Evaluación",
                       noEventsInRange: "No hay evaluaciones en esta fecha.",
                     }}
-                    views={["month", "agenda"]}
+                    views={{ month: true, agenda: SemesterAgenda }}
                   />
                 </div>
               )}

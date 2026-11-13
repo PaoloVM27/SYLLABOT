@@ -12,8 +12,23 @@ const source = await readFile(new URL("../src/lib/calendar-events.ts", import.me
 const javascript = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const { evaluationDates, parseEvaluationDate, scheduledEvaluations } = await import(
-  `data:text/javascript;base64,${Buffer.from(javascript).toString("base64")}`
+const { evaluationDates, parseEvaluationDate, scheduledEvaluations, monthNavigationDate } =
+  await import(`data:text/javascript;base64,${Buffer.from(javascript).toString("base64")}`);
+const agendaSource = await readFile(
+  new URL("../src/components/SemesterAgenda.tsx", import.meta.url),
+  "utf8",
+);
+const agendaJavascript = ts
+  .transpileModule(agendaSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+      jsx: ts.JsxEmit.React,
+    },
+  })
+  .outputText.replace('from "react"', `from ${JSON.stringify(import.meta.resolve("react"))}`);
+const { SemesterAgenda } = await import(
+  `data:text/javascript;base64,${Buffer.from(agendaJavascript).toString("base64")}`
 );
 const event = (id, value, selected = true) => ({
   id,
@@ -63,17 +78,16 @@ test("only selected valid events are eligible, in chronological order", () => {
 });
 
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales: { es } });
-const renderCalendar = (view, events) =>
+const renderCalendar = (view, events, date = new Date(2026, 9, 1)) =>
   renderToStaticMarkup(
     React.createElement(Calendar, {
       localizer,
       view,
-      views: ["month", "agenda"],
-      date: new Date(2026, 9, 1),
+      views: { month: true, agenda: SemesterAgenda },
+      date,
       onView: () => {},
       onNavigate: () => {},
       culture: "es",
-      length: 150,
       events: scheduledEvaluations(events),
     }),
   );
@@ -88,4 +102,45 @@ test("controlled month and agenda views render without pending practices", () =>
   assert.match(agenda, /Parcial visible/);
   assert.doesNotMatch(month, /Práctica pendiente/);
   assert.doesNotMatch(agenda, /Práctica pendiente/);
+});
+
+test("agenda includes all selected dated evaluations regardless of the displayed month or year", () => {
+  const events = [
+    event("Final lejano", "2029-12-10"),
+    event("Parcial anterior", "2026-10-15"),
+    event("PC2 intermedia", "2027-11-12"),
+    event("Pendiente", ""),
+    event("No seleccionada", "2028-01-01", false),
+  ];
+  const agenda = renderCalendar("agenda", events, new Date(2035, 6, 1));
+  assert.match(agenda, /Todas las evaluaciones/);
+  assert.match(agenda, /Parcial anterior/);
+  assert.match(agenda, /PC2 intermedia/);
+  assert.match(agenda, /Final lejano/);
+  assert.doesNotMatch(agenda, /Pendiente|No seleccionada|2035/);
+  assert.ok(agenda.indexOf("Parcial anterior") < agenda.indexOf("PC2 intermedia"));
+  assert.ok(agenda.indexOf("PC2 intermedia") < agenda.indexOf("Final lejano"));
+});
+
+test("Agenda toolbar has no rolling date-range label", () => {
+  const agenda = renderCalendar("agenda", [event("Final", "2026-12-10")]);
+  assert.match(agenda, /rbc-toolbar-label">Todas las evaluaciones</);
+});
+
+test("previous and next navigation move a calendar month instead of an agenda range", () => {
+  const current = new Date(2026, 9, 31);
+  const next = monthNavigationDate(current, "NEXT", new Date(2027, 4, 1));
+  const previous = monthNavigationDate(current, "PREV", new Date(2026, 4, 1));
+  assert.deepEqual([next.getFullYear(), next.getMonth(), next.getDate()], [2026, 10, 1]);
+  assert.deepEqual([previous.getFullYear(), previous.getMonth(), previous.getDate()], [2026, 8, 1]);
+  const newYear = monthNavigationDate(new Date(2026, 11, 31), "NEXT");
+  assert.deepEqual([newYear.getFullYear(), newYear.getMonth()], [2027, 0]);
+});
+
+test("today and direct month navigation retain their intended dates", () => {
+  const current = new Date(2026, 9, 15);
+  const today = new Date(2026, 10, 12);
+  assert.equal(monthNavigationDate(current, "TODAY", current, today), today);
+  const chosen = new Date(2026, 11, 9);
+  assert.equal(monthNavigationDate(current, "DATE", chosen), chosen);
 });

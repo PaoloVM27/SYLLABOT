@@ -43,3 +43,16 @@ export function scheduledEvaluations<T extends CalendarDates & { selected: boole
     )
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 }
+
+export function monthNavigationDate(
+  current: Date,
+  action: "PREV" | "NEXT" | "TODAY" | "DATE",
+  chosen = current,
+  today = new Date(),
+): Date {
+  if (action === "TODAY") return today;
+  if (action === "PREV" || action === "NEXT") {
+    return new Date(current.getFullYear(), current.getMonth() + (action === "NEXT" ? 1 : -1), 1);
+  }
+  return chosen;
+}

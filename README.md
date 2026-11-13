@@ -70,7 +70,10 @@ Las evaluaciones por confirmar permanecen en la lista de revisión, sin una fech
 provisional en el calendario. Mes, Agenda, Google Calendar y `.ics` muestran o
 exportan únicamente evaluaciones seleccionadas con fecha válida. Asignar una
 fecha manual las incorpora al calendario; quitarla vuelve a dejarlas pendientes.
-Mes y Agenda comparten el mismo filtro y una vista controlada. Tras sincronizar
+Agenda reúne todas las evaluaciones seleccionadas con fecha en orden cronológico,
+sin filtrar por mes, año o un rango fijo. Mes vuelve a la cuadrícula conservando
+el mes consultado; Hoy, Ant y Sig cambian a Mes y navegan por meses.
+Ambas vistas comparten el mismo filtro y una vista controlada. Tras sincronizar
 con Google, las evaluaciones pendientes permanecen disponibles para completarlas.
 
 Limitaciones: no incluye OCR para PDF escaneados; los documentos sin texto
