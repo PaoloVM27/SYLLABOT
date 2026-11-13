@@ -65,3 +65,24 @@ backend/*.egg-info/
 # ─── OS ──────────────────────────────────────────────────────────────────────
 Thumbs.db
 Desktop.ini
+
+# Local audit reports (keep reusable security tooling tracked)
+/security/*.md
+/security/*.json
+
+# Local test suites
+/tests/
+/backend/test_*.py
+/backend/tests/
+**/__tests__/
+
+# Generated test reports and development caches
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+test-results/
+playwright-report/
+.ruff_cache/
+.eslintcache
+*.tsbuildinfo

@@ -118,16 +118,14 @@ de la API, actualiza también `ALLOWED_API_HOSTS` y la política CSP del fronten
 Desde la raíz, usando el Python del entorno virtual del backend:
 
 ```sh
-python -m unittest discover -s backend -p "test_*.py" -v
-node --test tests/syllabus-api.test.mjs tests/calendar-events.test.mjs tests/security.test.mjs
 pnpm exec tsc --noEmit
 pnpm exec eslint src/routes/index.tsx src/lib/syllabus-api.ts
 pnpm build
 ```
 
-Las pruebas usan PDF sintéticos y respuestas simuladas de Gemini a través del
-SDK real. No envían documentos ni consumen cuota del proveedor. Para ejecutar
-las pruebas de API necesitas `httpx`, instalado también como dependencia del SDK.
+Las pruebas y los informes de auditoría se conservan localmente y se excluyen
+del repositorio. GitHub Actions mantiene las comprobaciones de dependencias,
+secretos, TypeScript y compilación.
 
 ## Despliegue y diagnóstico
 
@@ -145,7 +143,5 @@ el PDF, su texto ni credenciales. La respuesta devuelve `request_id`, `metodo`,
 
 Mejoras pendientes recomendadas: OCR opcional para escaneos, validación con
 sílabos reales y revisión del tamaño del JavaScript y las imágenes.
-La auditoría, controles aplicados, límites antiabuso y ajustes pendientes de
-infraestructura se documentan en [security/AUDITORIA.md](security/AUDITORIA.md).
 Un plan de Render sin suspensión reduce el arranque en frío; no sustituye los
 límites de espera y el manejo de fallos implementados aquí.
