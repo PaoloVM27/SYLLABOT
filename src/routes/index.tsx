@@ -25,7 +25,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { LoginScreen } from "@/auth/LoginScreen";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { Calendar, dateFnsLocalizer } from "react-big-calendar";
+import { Calendar, dateFnsLocalizer, type View } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ import {
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { prepareSyllabusService, uploadSyllabus } from "@/lib/syllabus-api";
 import { analysisPresentation } from "@/lib/analysis-presentation";
+import { evaluationDates, scheduledEvaluations } from "@/lib/calendar-events";
 import {
   Dialog,
   DialogContent,
@@ -98,8 +99,6 @@ interface SyllabotEvent {
   category: EventCategory;
   selected: boolean;
   hasExactDate: boolean;
-  isVagueDate?: boolean;
-  vagueDateRef?: number;
 }
 
 /* ── Clasificador de Categorías por Color ── */
@@ -348,7 +347,7 @@ function Index() {
   const [fileName, setFileName] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [events, setEvents] = useState<SyllabotEvent[]>([]);
-  const [calendarView, setCalendarView] = useState<string>("month");
+  const [calendarView, setCalendarView] = useState<View>("month");
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -514,37 +513,10 @@ function Index() {
         ),
       );
 
-      let minDate = new Date();
       const rawEvaluaciones: RawEval[] = data.evaluaciones || [];
-      const exactDates = rawEvaluaciones.filter(
-        (e): e is RawEval & { fecha: string } =>
-          Boolean(e.fecha) && e.fecha !== "0000-00-00" && !e.fecha!.includes("0000"),
-      );
-      if (exactDates.length > 0) {
-        const times = exactDates.map((e) =>
-          new Date(e.fecha.replace(/\//g, "-") + "T10:00:00").getTime(),
-        );
-        minDate = new Date(Math.min(...times));
-      }
-
-      // Fecha ancla para agrupar eventos sin fecha fija
-      const vagueDate = new Date(minDate);
-      vagueDate.setDate(vagueDate.getDate() - 1);
-      vagueDate.setHours(0, 0, 0, 0);
-
       const parsedEvents: SyllabotEvent[] = rawEvaluaciones.map((ev: RawEval, index: number) => {
-        const hasExactDate =
-          Boolean(ev.fecha) && ev.fecha !== "0000-00-00" && !ev.fecha!.includes("0000");
-
-        let startDate: Date;
-        if (hasExactDate) {
-          startDate = new Date(ev.fecha!.replace(/\//g, "-") + "T10:00:00");
-        } else {
-          startDate = new Date(vagueDate);
-          startDate.setHours(10, 0, 0, 0);
-        }
-
-        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+        const dates = evaluationDates(ev.fecha || "");
+        const hasExactDate = dates.hasExactDate;
         const dateWarning = hasExactDate ? "" : " ⚠️";
         const title = (ev.nombre || "Evaluación").trim();
 
@@ -554,21 +526,18 @@ function Index() {
           tooltip: `${title}${typeof ev.peso === "number" && ev.peso > 0 ? ` (${ev.peso}%)` : ""}${
             hasExactDate ? "" : " (Fecha sin especificar)"
           }`,
-          start: isNaN(startDate.getTime()) ? new Date() : startDate,
-          end: isNaN(endDate.getTime()) ? new Date() : endDate,
+          ...dates,
           description: `Peso de la evaluación: ${typeof ev.peso === "number" ? ev.peso : "No especificado"}%`,
           category: categorizeEvent(title),
           selected: true,
-          hasExactDate: hasExactDate,
-          isVagueDate: !hasExactDate,
-          vagueDateRef: vagueDate.getTime(),
           ...(typeof ev.peso === "number" ? { peso: ev.peso } : {}),
         };
         return eventItem;
       });
 
       setEvents(parsedEvents);
-      setCurrentDate(vagueDate);
+      setCurrentDate(scheduledEvaluations(parsedEvents)[0]?.start || new Date());
+      setCalendarView("month");
       setAnalysisProgress(100);
       setAnalysisMessage("¡Calendario listo!");
       await new Promise((resolve) => setTimeout(resolve, 250));
@@ -603,6 +572,7 @@ function Index() {
     setEvents([]);
     setSelectedFile(null);
     setCurrentDate(new Date());
+    setCalendarView("month");
     setEditingId(null);
     setEditTitle("");
     setEditDate("");
@@ -643,7 +613,6 @@ function Index() {
     setEditingId(null);
     setEditTitle("");
     setEditDate("");
-    setCourseName("");
   };
 
   const handleSaveEvent = (id: string) => {
@@ -653,56 +622,35 @@ function Index() {
       return;
     }
 
-    let dateWasUpdated = false;
-    let targetDate: Date | null = null;
-
+    const dates = evaluationDates(editDate);
+    if (editDate && !dates.hasExactDate) {
+      toast.error("Ingresa una fecha válida para la evaluación.");
+      return;
+    }
+    const dateWarning = dates.hasExactDate ? "" : " ⚠️";
     setEvents((prev) =>
-      prev.map((e) => {
-        if (e.id !== id) return e;
-
-        let newStart = e.start;
-        let newEnd = e.end;
-        let hasExact = e.hasExactDate;
-
-        if (editDate) {
-          const parsed = new Date(`${editDate}T10:00:00`);
-          if (!isNaN(parsed.getTime())) {
-            newStart = parsed;
-            newEnd = new Date(parsed.getTime() + 2 * 60 * 60 * 1000);
-            hasExact = true;
-            dateWasUpdated = true;
-            targetDate = parsed;
-          }
-        }
-
-        const dateWarning = hasExact ? "" : " ⚠️";
-
-        return {
-          ...e,
-          title: cleanTitle + dateWarning,
-          tooltip: `${cleanTitle}${typeof e.peso === "number" && e.peso > 0 ? ` (${e.peso}%)` : ""}${
-            hasExact ? "" : " (Fecha sin especificar)"
-          }`,
-          start: newStart,
-          end: newEnd,
-          hasExactDate: hasExact,
-          isVagueDate: !hasExact,
-          category: categorizeEvent(cleanTitle),
-        };
-      }),
+      prev.map((event) =>
+        event.id === id
+          ? {
+              ...event,
+              ...dates,
+              title: cleanTitle + dateWarning,
+              tooltip: `${cleanTitle}${typeof event.peso === "number" && event.peso > 0 ? ` (${event.peso}%)` : ""}${dates.hasExactDate ? "" : " (Fecha sin especificar)"}`,
+              category: categorizeEvent(cleanTitle),
+            }
+          : event,
+      ),
     );
-
-    if (dateWasUpdated && targetDate) {
-      setCurrentDate(targetDate);
+    if (dates.hasExactDate) {
+      setCurrentDate(dates.start);
       toast.success("Fecha actualizada y posicionada en el calendario");
     } else {
-      toast.success("Evaluación actualizada");
+      toast.success("Evaluación guardada con fecha por confirmar");
     }
 
     setEditingId(null);
     setEditTitle("");
     setEditDate("");
-    setCourseName("");
   };
 
   const handleAddCustomEvent = (e: React.FormEvent) => {
@@ -712,27 +660,22 @@ function Index() {
       return;
     }
 
-    let start = new Date();
-    let hasExact = false;
-    if (newEventDate) {
-      start = new Date(`${newEventDate}T10:00:00`);
-      hasExact = true;
+    const dates = evaluationDates(newEventDate);
+    if (newEventDate && !dates.hasExactDate) {
+      toast.error("Ingresa una fecha válida para la evaluación.");
+      return;
     }
-    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-
     const newEv: SyllabotEvent = {
       id: `ev-manual-${Date.now()}`,
       title: newEventTitle,
       tooltip: newEventTitle,
-      start,
-      end,
+      ...dates,
       category: newEventCategory,
       selected: true,
-      hasExactDate: hasExact,
-      isVagueDate: !hasExact,
     };
 
     setEvents((prev) => [...prev, newEv]);
+    if (dates.hasExactDate) setCurrentDate(dates.start);
     setNewEventTitle("");
     setNewEventDate("");
     setShowAddModal(false);
@@ -741,9 +684,9 @@ function Index() {
 
   /* ── Sincronizar directamente con Google Calendar ── */
   const handleSyncGoogleCalendar = async () => {
-    const activeEvents = events.filter((e) => e.selected);
+    const activeEvents = scheduledEvaluations(events);
     if (activeEvents.length === 0) {
-      toast.error("Selecciona al menos una evaluación para sincronizar.");
+      toast.error("Selecciona una evaluación con fecha para sincronizar.");
       return;
     }
 
@@ -802,9 +745,6 @@ function Index() {
           "📌 Evaluación sincronizada automáticamente por Syllabot UNMSM.",
           courseName.trim() ? `Curso: ${courseName.trim()}` : "",
           ev.description ? `Detalle: ${ev.description}` : "",
-          ev.hasExactDate === false
-            ? "⚠️ Advertencia: Fecha estimada en el sílabo. Confirma la fecha exacta con tu docente."
-            : "",
         ].filter(Boolean);
 
         let colorId = "9"; // Azul marino (Prácticas)
@@ -872,8 +812,14 @@ function Index() {
 
       const finalCourseName = courseName.trim() || "Tu Asignatura";
 
-      // Limpiar el fondo (calendario, archivo y revisión) dejándolo listo para subir otro archivo
-      reset();
+      // Keep pending/unselected evaluations available for later manual completion.
+      const exportedIds = new Set(activeEvents.map((event) => event.id));
+      const remainingEvents = events.filter((event) => !exportedIds.has(event.id));
+      if (remainingEvents.length > 0) {
+        setEvents(remainingEvents);
+      } else {
+        reset();
+      }
 
       // Abrir modal centrado con fondo difuminado
       setSuccessModalData({
@@ -899,9 +845,9 @@ function Index() {
 
   /* ── Exportar a archivo estándar .ics (Google Calendar / Apple / Outlook) ── */
   const handleExportICS = () => {
-    const activeEvents = events.filter((e) => e.selected);
+    const activeEvents = scheduledEvaluations(events);
     if (activeEvents.length === 0) {
-      toast.error("Selecciona al menos una evaluación para exportar.");
+      toast.error("Selecciona una evaluación con fecha para exportar.");
       return;
     }
 
@@ -998,8 +944,22 @@ function Index() {
   };
 
   // Eventos activos que se muestran en el calendario
-  const calendarEvents = events.filter((e) => e.selected);
+  const calendarEvents = scheduledEvaluations(events);
   const activeEventsCount = calendarEvents.length;
+  const selectedEventsCount = events.filter((event) => event.selected).length;
+  const pendingEventsCount = selectedEventsCount - activeEventsCount;
+  const hasPendingDates = events.some((event) => !event.hasExactDate);
+  const calendarWarnings = analysisWarnings.filter(
+    (warning) => !warning.startsWith("Hay evaluaciones sin fecha") || hasPendingDates,
+  );
+  if (
+    hasPendingDates &&
+    !calendarWarnings.some((warning) => warning.startsWith("Hay evaluaciones sin fecha"))
+  ) {
+    calendarWarnings.push(
+      "Hay evaluaciones sin fecha suficiente en el documento; quedaron por confirmar.",
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans antialiased overflow-x-hidden">
@@ -1414,7 +1374,7 @@ function Index() {
                   <div>
                     <h2 className="text-lg font-bold text-foreground">Revisión de Evaluaciones</h2>
                     <p className="text-xs text-muted-foreground">
-                      {activeEventsCount} de {events.length} seleccionadas para el calendario
+                      {selectedEventsCount} de {events.length} seleccionadas
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1683,7 +1643,8 @@ function Index() {
                 </h3>
                 {events.length > 0 && (
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Mostrando {activeEventsCount} evaluaciones seleccionadas
+                    Mostrando {activeEventsCount} evaluaciones con fecha
+                    {pendingEventsCount > 0 && ` · ${pendingEventsCount} por confirmar`}
                   </p>
                 )}
               </div>
@@ -1742,14 +1703,11 @@ function Index() {
                 <span className="flex items-center gap-1.5 font-medium">
                   <span className="size-2 rounded-full bg-emerald-500" /> Proyectos
                 </span>
-                <span className="flex items-center gap-1.5 font-medium">
-                  <span className="size-2 rounded-full bg-amber-500" /> Por Confirmar
-                </span>
               </div>
             )}
 
             {/* Calendar Body */}
-            <div className="flex-1 p-4 overflow-hidden relative">
+            <div className="flex-1 min-h-0 p-4 overflow-hidden relative">
               {/* Empty State Limpio y Centrado */}
               {events.length === 0 ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-20 p-8 text-center bg-card">
@@ -1782,14 +1740,11 @@ function Index() {
                   </div>
                 </div>
               ) : (
-                <div className="h-full">
+                <div className="h-full min-h-0">
                   <Calendar
                     localizer={localizer}
-                    events={
-                      calendarView === "month"
-                        ? calendarEvents.filter((e) => e.hasExactDate !== false)
-                        : calendarEvents
-                    }
+                    events={calendarEvents}
+                    view={calendarView}
                     onView={(view) => setCalendarView(view)}
                     date={currentDate}
                     onNavigate={(newDate) => setCurrentDate(newDate)}
@@ -1797,39 +1752,11 @@ function Index() {
                     endAccessor="end"
                     tooltipAccessor="tooltip"
                     eventPropGetter={eventStyleGetter}
-                    style={{ height: "100%", minHeight: 400 }}
+                    style={{ height: "100%" }}
                     culture="es"
                     length={150}
                     formats={{
                       agendaDateFormat: "dd/MM/yyyy",
-                    }}
-                    components={{
-                      agenda: {
-                        date: (props) => {
-                          const isVagueDateGroup = events.some(
-                            (e) =>
-                              e.isVagueDate &&
-                              new Date(e.vagueDateRef!).getTime() === props.day.getTime(),
-                          );
-                          if (isVagueDateGroup) {
-                            return (
-                              <span className="font-semibold text-amber-600 dark:text-amber-400">
-                                Sin especificar
-                              </span>
-                            );
-                          }
-                          return <span>{props.label}</span>;
-                        },
-                        time: (props) => {
-                          const ev = props.event as Partial<SyllabotEvent>;
-                          if (ev.isVagueDate) {
-                            return (
-                              <span className="text-muted-foreground italic">Por confirmar</span>
-                            );
-                          }
-                          return <span>{props.label}</span>;
-                        },
-                      },
                     }}
                     messages={{
                       next: "Sig",
@@ -1844,14 +1771,13 @@ function Index() {
                       event: "Evaluación",
                       noEventsInRange: "No hay evaluaciones en esta fecha.",
                     }}
-                    defaultView="month"
                     views={["month", "agenda"]}
                   />
                 </div>
               )}
             </div>
           </div>
-          {phase === "success" && analysisWarnings.length > 0 && (
+          {phase === "success" && calendarWarnings.length > 0 && (
             <aside
               role="status"
               aria-label="Avisos sobre las fechas del calendario"
@@ -1859,7 +1785,7 @@ function Index() {
             >
               <Info className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
               <div className="min-w-0 space-y-1">
-                {analysisWarnings.map((warning) => (
+                {calendarWarnings.map((warning) => (
                   <p key={warning}>{warning}</p>
                 ))}
               </div>
