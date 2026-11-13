@@ -9,8 +9,9 @@ editar y exportar a Google Calendar o a un archivo `.ics`.
    backend mientras eliges tu archivo. Es una consulta opcional: si falla o la
    ruta no existe en una versión anterior, no bloquea `POST /upload`.
 2. `POST /upload` acepta PDF de hasta 10 MB, 50 páginas y 200 000 caracteres.
-   La lectura del PDF y la extracción por reglas se ejecutan fuera del bucle que
-   atiende las solicitudes. Se permiten dos trabajos de extracción simultáneos.
+   Requiere un ID token de Firebase verificado de una cuenta Google institucional.
+   Admite dos cargas simultáneas (una por usuario). El PDF se procesa en un
+   subproceso, con un lector activo y límites de tiempo, CPU y memoria.
 3. El resultado sin IA se calcula primero. Gemini intenta mejorarlo una sola vez,
    durante un máximo de 12 segundos por defecto. Ante cuota agotada, error,
    respuesta inválida, ausencia de clave o saturación local, se devuelve la
@@ -28,8 +29,9 @@ editar y exportar a Google Calendar o a un archivo `.ics`.
 
 Estos límites no prometen un tiempo total en producción: la subida, el arranque
 de Render y el costo de lectura del PDF son adicionales al presupuesto de Gemini.
-Cancelar en el navegador deja de esperar el resultado; una lectura de PDF que ya
-se esté ejecutando en el servidor puede continuar hasta terminar.
+Al cancelar la respuesta en streaming se cancela el trabajo asociado y se detiene
+su lector de PDF. El proceso se termina también al superar 18 segundos de lectura
+o extracción (12 segundos de CPU y 256 MB de espacio virtual en Linux).
 
 ## Extracción sin IA
 
@@ -106,6 +108,10 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 `GEMINI_API_KEY` es opcional. `GEMINI_MODEL` permite cambiar el modelo sin editar
 código. `AI_TIMEOUT_SECONDS` tiene valor predeterminado 12 y se acota entre 1 y
 30 segundos. `CORS_ORIGINS` agrega dominios del frontend separados por comas.
+`FIREBASE_PROJECT_ID` debe coincidir con el proyecto de Firebase del frontend
+(predeterminado: `syllabot-unmsm`). La página envía `Authorization: Bearer <ID token>`;
+no se usan credenciales de cuenta de servicio en el navegador. Si cambia el dominio
+de la API, actualiza también `ALLOWED_API_HOSTS` y la política CSP del frontend.
 
 ## Verificación
 
@@ -113,7 +119,7 @@ Desde la raíz, usando el Python del entorno virtual del backend:
 
 ```sh
 python -m unittest discover -s backend -p "test_*.py" -v
-node --test tests/syllabus-api.test.mjs tests/calendar-events.test.mjs
+node --test tests/syllabus-api.test.mjs tests/calendar-events.test.mjs tests/security.test.mjs
 pnpm exec tsc --noEmit
 pnpm exec eslint src/routes/index.tsx src/lib/syllabus-api.ts
 pnpm build
@@ -125,8 +131,10 @@ las pruebas de API necesitas `httpx`, instalado también como dependencia del SD
 
 ## Despliegue y diagnóstico
 
-Despliega el backend con directorio raíz `backend`, instala `requirements.txt`
-y usa `uvicorn main:app --host 0.0.0.0 --port $PORT`. Publica también el frontend
+Despliega el backend con directorio raíz `backend`, usa `sh build.sh` como comando
+de construcción y el comando de `Procfile` para el arranque. Las opciones del
+servidor deben copiarse a Render si su comando de arranque está configurado
+manualmente en la consola. Publica también el frontend
 con su `VITE_API_URL` correcto para incorporar la nueva pantalla y `/health`.
 Los cambios locales no se sincronizan hasta publicarlos.
 
@@ -136,7 +144,8 @@ el PDF, su texto ni credenciales. La respuesta devuelve `request_id`, `metodo`,
 `advertencias` y `tiempo_segundos` para ayudar a diagnosticar las esperas.
 
 Mejoras pendientes recomendadas: OCR opcional para escaneos, validación con
-sílabos reales, autenticación y límites de peticiones en la API pública (CORS no
-sustituye autenticación), y revisión del tamaño del JavaScript y las imágenes.
+sílabos reales y revisión del tamaño del JavaScript y las imágenes.
+La auditoría, controles aplicados, límites antiabuso y ajustes pendientes de
+infraestructura se documentan en [security/AUDITORIA.md](security/AUDITORIA.md).
 Un plan de Render sin suspensión reduce el arranque en frío; no sustituye los
 límites de espera y el manejo de fallos implementados aquí.

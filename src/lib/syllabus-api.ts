@@ -49,14 +49,20 @@ export async function uploadSyllabus(
   file: File,
   signal: AbortSignal,
   onProgress: (progress: ProcessingProgress) => void,
+  idToken: string,
 ): Promise<SyllabusResponse> {
+  if (!idToken)
+    throw new Error("Inicia sesión con tu cuenta institucional para analizar un sílabo.");
   const body = new FormData();
   body.append("file", file);
   // Include Render's cold start in this budget. Gemini has its own short server deadline.
   const response = await fetch(`${API_URL}/upload`, {
     method: "POST",
     body,
-    headers: { Accept: "application/x-ndjson, application/json" },
+    headers: {
+      Accept: "application/x-ndjson, application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
     signal: AbortSignal.any([signal, AbortSignal.timeout(180_000)]),
   });
   if (!response.ok) {
@@ -88,6 +94,7 @@ export async function uploadSyllabus(
   let buffer = "";
   let result: SyllabusResponse | undefined;
   let previousPercent = 0;
+  let receivedBytes = 0;
   const consume = (line: string) => {
     if (!line.trim()) return;
     const event = JSON.parse(line);
@@ -108,6 +115,9 @@ export async function uploadSyllabus(
   try {
     while (true) {
       const { done, value } = await reader.read();
+      receivedBytes += value?.byteLength || 0;
+      if (receivedBytes > 2 * 1024 * 1024)
+        throw new Error("El resultado excede el tamaño permitido.");
       buffer += decoder.decode(value, { stream: !done });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";

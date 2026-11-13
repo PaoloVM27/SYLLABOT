@@ -1,32 +1,29 @@
 """PDF extraction with a bounded, optional AI enhancement."""
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from functools import partial
-import io
 import json
 import logging
 import os
 from time import monotonic
 from uuid import uuid4
 
-import anyio
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from google import genai
 from google.genai import types
-import pdfplumber
 from pydantic import BaseModel, Field, ValidationError
 
-from extraction import extract_without_ai, finalize, merge_results
+from extraction import finalize, merge_results
+from pdf_processing import run_pdf_worker
+from security import ALLOWED_ORIGINS, SecurityHeaders, UploadGuard, UploadSecurity
 
 load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 AI_TIMEOUT_SECONDS = max(1, min(30, float(os.getenv("AI_TIMEOUT_SECONDS", "12"))))
 MAX_BYTES = 10 * 1024 * 1024
-MAX_PAGES = 50
-MAX_TEXT = 200_000
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(
@@ -38,7 +35,7 @@ client = genai.Client(
 ) if api_key else None
 ai_unavailable_until = 0.0
 ai_slots = asyncio.Semaphore(2)
-pdf_slots = anyio.CapacityLimiter(2)
+security = UploadSecurity()
 
 
 class Evaluation(BaseModel):
@@ -97,48 +94,28 @@ async def lifespan(app):
         client.close()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.add_middleware(UploadGuard, security=security)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", "http://localhost:3000", "http://localhost:8080",
-        "https://syllabot-red.vercel.app",
-        *filter(None, os.getenv("CORS_ORIGINS", "").split(",")),
-    ],
+    allow_origins=sorted(ALLOWED_ORIGINS),
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+    max_age=600,
 )
+app.add_middleware(SecurityHeaders)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=[
+    "syllabot-ubc7.onrender.com", "localhost", "127.0.0.1",
+    *filter(None, os.getenv("ALLOWED_API_HOSTS", "").split(",")),
+])
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "processing_version": "pdf-progress-v1",
             "commit": os.getenv("RENDER_GIT_COMMIT", "local")}
-
-
-def read_pdf(contents: bytes, on_page=None) -> str:
-    try:
-        with pdfplumber.open(io.BytesIO(contents)) as pdf:
-            if len(pdf.pages) > MAX_PAGES:
-                raise HTTPException(413, f"El PDF supera el límite de {MAX_PAGES} páginas.")
-            pages = []
-            size = 0
-            for page in pdf.pages:
-                text = page.extract_text(x_tolerance=2) or ""
-                size += len(text)
-                if size > MAX_TEXT:
-                    raise HTTPException(413, "El PDF contiene demasiado texto. Sube solo el sílabo del curso.")
-                pages.append(text)
-                page.close()
-                if on_page:
-                    on_page(len(pages), len(pdf.pages))
-            return "\n\f\n".join(pages)
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(422, "No se pudo leer el PDF. Verifica que no esté dañado o protegido.") from None
 
 
 async def enhance_with_ai(text: str, fallback: dict) -> tuple[dict, str]:
@@ -160,6 +137,7 @@ async def enhance_with_ai(text: str, fallback: dict) -> tuple[dict, str]:
                         response_mime_type="application/json",
                         response_schema=Extraction,
                         temperature=0,
+                        max_output_tokens=8192,
                     ),
                 ),
                 timeout=AI_TIMEOUT_SECONDS,
@@ -182,24 +160,18 @@ async def enhance_with_ai(text: str, fallback: dict) -> tuple[dict, str]:
 async def process_pdf(contents: bytes, use_ai: bool, report=None):
     request_id = uuid4().hex[:12]
     started = monotonic()
-    loop = asyncio.get_running_loop()
 
     def progress(percent, message):
         if report:
             report({"type": "progress", "percent": percent, "message": message})
 
     def page_read(done, total):
-        loop.call_soon_threadsafe(progress, 10 + int(55 * done / total),
-                                 f"Leyendo páginas del PDF: {done} de {total}")
+        progress(10 + int(55 * done / total), f"Leyendo páginas del PDF: {done} de {total}")
 
     progress(5, "PDF recibido. Preparando la lectura...")
-    text = await anyio.to_thread.run_sync(
-        partial(read_pdf, contents, page_read if report else None), limiter=pdf_slots)
-    if not text.strip():
-        raise HTTPException(422, "El PDF no tiene texto seleccionable. Necesita reconocimiento de texto (OCR); prueba con el PDF original o uno con texto.")
+    text, fallback = await run_pdf_worker(contents, page_read if report else None)
     pdf_seconds = monotonic() - started
     progress(65, "Texto del PDF leído. Detectando evaluaciones...")
-    fallback = await anyio.to_thread.run_sync(extract_without_ai, text, limiter=pdf_slots)
     progress(75, "Analizando evaluaciones y fechas...")
     parsed, reason = await enhance_with_ai(text, fallback) if use_ai else (fallback, "disabled")
     progress(90, "Organizando evaluaciones y fechas...")
@@ -215,13 +187,13 @@ async def process_pdf(contents: bytes, use_ai: bool, report=None):
     logger.info("upload request_id=%s method=%s reason=%s pdf_seconds=%.3f total_seconds=%.3f evaluations=%d",
                 request_id, "ai" if reason == "ok" else "rules", reason, pdf_seconds, total, len(evaluations))
     progress(95, "Evaluaciones listas. Preparando el calendario...")
-    return {"evaluaciones": evaluations, "curso": parsed.get("nombre_curso", ""),
+    return {"evaluaciones": evaluations, "curso": str(parsed.get("nombre_curso", ""))[:200],
             "metodo": "ia" if reason == "ok" else "reglas", "advertencias": warnings,
             "tiempo_segundos": total, "request_id": request_id}
 
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...), use_ai: bool = True,
+async def upload_pdf(request: Request, file: UploadFile = File(...), use_ai: bool = True,
                      accept: str = Header(default="application/json")):
     if not (file.filename or "").lower().endswith(".pdf"):
         await file.close()
@@ -234,6 +206,7 @@ async def upload_pdf(file: UploadFile = File(...), use_ai: bool = True,
         raise HTTPException(413, "El PDF supera el límite de 10 MB.")
     if not contents.lstrip().startswith(b"%PDF-"):
         raise HTTPException(422, "El archivo no es un PDF válido.")
+    use_ai = use_ai and security.allow_ai(request.state.user_id)
     # Keep the original JSON contract for older frontends and API clients.
     if "application/x-ndjson" not in accept:
         return await process_pdf(contents, use_ai)

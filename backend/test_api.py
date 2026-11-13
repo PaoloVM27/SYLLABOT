@@ -1,6 +1,5 @@
 import asyncio
 import json
-import threading
 from time import monotonic
 from types import SimpleNamespace
 import unittest
@@ -10,9 +9,12 @@ import httpx
 from google import genai
 from google.genai import types
 import main
+import pdf_processing
+from extraction import extract_without_ai
+from security import SlidingLimits
 
 
-def pdf_bytes(text="Curso: Fisica\nCRONOGRAMA\nSemana 8 Examen Parcial 20%\nSemana 16 Examen Final 40%"):
+def pdf_bytes(text="Curso: Fisica\nCRONOGRAMA\nSemana 8 Examen Parcial 20%\nSemana 16 Examen Final 40%", pages=1):
     """Tiny real text PDF; no fixture documents or personal data required."""
     stream = b"BT /F1 12 Tf 40 780 Td 16 TL\n"
     for line in text.splitlines():
@@ -20,10 +22,10 @@ def pdf_bytes(text="Curso: Fisica\nCRONOGRAMA\nSemana 8 Examen Parcial 20%\nSema
         stream += b"(" + escaped.encode("latin-1") + b") Tj T*\n"
     stream += b"ET"
     objects = [b"<< /Type /Catalog /Pages 2 0 R >>",
-               b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-               b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+               b"<< /Type /Pages /Kids [" + b" ".join(f"{i + 5} 0 R".encode() for i in range(pages)) + b"] /Count " + str(pages).encode() + b" >>",
                b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-               b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream"]
+               b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+               *[b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>"] * pages]
     output = b"%PDF-1.4\n"
     offsets = [0]
     for i, obj in enumerate(objects, 1):
@@ -37,16 +39,23 @@ def pdf_bytes(text="Curso: Fisica\nCRONOGRAMA\nSemana 8 Examen Parcial 20%\nSema
 
 class ApiTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.api = httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://test")
+        self.api = httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://localhost")
         self.key_patch = patch.object(main, "client", None)
         self.key_patch.start()
+        main.security.limits = SlidingLimits()
+        main.security.active = 0
+        main.security.active_users.clear()
+        self.auth_patch = patch.object(main.security.verifier, "verify", AsyncMock(return_value="test-user"))
+        self.auth_patch.start()
+        self.api.headers["Authorization"] = "Bearer test-api-token"
         main.ai_unavailable_until = 0
         main.ai_slots = asyncio.Semaphore(2)
-        main.pdf_slots = main.anyio.CapacityLimiter(2)
+        pdf_processing.worker_slots = asyncio.Semaphore(1)
 
     async def asyncTearDown(self):
         await self.api.aclose()
         self.key_patch.stop()
+        self.auth_patch.stop()
 
     async def upload(self, suffix="", contents=None, filename="silabo.pdf", headers=None):
         return await self.api.post("/upload" + suffix, headers=headers, files={"file": (filename, pdf_bytes() if contents is None else contents, "application/pdf")})
@@ -151,14 +160,30 @@ Examen final 40%"""
             response = await self.upload(contents=contents, filename=filename)
             self.assertEqual(response.status_code, status)
 
+    async def test_anonymous_upload_is_rejected_before_multipart_validation(self):
+        self.api.headers.pop("Authorization")
+        response = await self.api.post("/upload", content=b"")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(response.headers["WWW-Authenticate"], "Bearer")
+
+    async def test_auth_header_is_allowed_in_legitimate_cors_preflight(self):
+        response = await self.api.options("/upload", headers={
+            "Origin": "https://syllabot-red.vercel.app", "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "https://syllabot-red.vercel.app")
+
+    async def test_untrusted_host_and_api_documentation_are_not_exposed(self):
+        self.assertEqual((await self.api.get("/health", headers={"Host": "evil.example"})).status_code, 400)
+        self.assertEqual((await self.api.get("/openapi.json")).status_code, 404)
+
     async def test_file_limit_is_enforced(self):
         response = await self.upload(contents=b"%PDF-" + b"x" * main.MAX_BYTES)
         self.assertEqual(response.status_code, 413)
 
     async def test_page_limit_is_enforced_before_extracting(self):
-        with patch.object(main.pdfplumber, "open") as reader:
-            reader.return_value.__enter__.return_value.pages = [None] * 51
-            response = await self.upload()
+        response = await self.upload(contents=pdf_bytes(pages=51))
         self.assertEqual(response.status_code, 413)
 
     async def test_timeout_cancels_ai_and_returns_fallback(self):
@@ -175,7 +200,7 @@ Examen final 40%"""
         with patch.object(main, "client", fake), patch.object(main, "AI_TIMEOUT_SECONDS", 0.03):
             started = monotonic()
             response = await self.upload()
-            self.assertLess(monotonic() - started, 1)
+            self.assertLess(monotonic() - started, 5)
         self.assertTrue(cancelled.is_set())
         self.assertEqual(response.json()["metodo"], "reglas")
         self.assertEqual(generate.await_count, 1)
@@ -240,16 +265,17 @@ Examen final 40%"""
         fake.aio.models.generate_content.assert_not_awaited()
 
     async def test_health_remains_responsive_during_pdf_processing(self):
-        started, release = threading.Event(), threading.Event()
+        started, release = asyncio.Event(), asyncio.Event()
 
-        def slow_read(contents, on_page=None):
+        async def slow_read(contents, on_page=None):
             started.set()
-            release.wait(2)
-            return "Semana 8 Examen Parcial"
+            await release.wait()
+            text = "Semana 8 Examen Parcial"
+            return text, extract_without_ai(text)
 
-        with patch.object(main, "read_pdf", slow_read):
+        with patch.object(main, "run_pdf_worker", slow_read):
             task = asyncio.create_task(self.upload())
-            await asyncio.to_thread(started.wait, 1)
+            await asyncio.wait_for(started.wait(), 1)
             try:
                 response = await asyncio.wait_for(self.api.get("/health"), timeout=0.5)
                 self.assertEqual(response.status_code, 200)
@@ -257,6 +283,7 @@ Examen final 40%"""
             finally:
                 release.set()
                 await task
+
 
 
 if __name__ == "__main__":

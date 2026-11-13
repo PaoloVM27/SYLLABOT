@@ -44,6 +44,12 @@ import { analysisPresentation } from "@/lib/analysis-presentation";
 import { evaluationDates, monthNavigationDate, scheduledEvaluations } from "@/lib/calendar-events";
 import { SemesterAgenda } from "@/components/SemesterAgenda";
 import {
+  calendarAccessToken,
+  rememberCalendarAccess,
+  clearCalendarAccess,
+} from "@/lib/calendar-auth";
+import { escapeIcsText, foldIcsLine } from "@/lib/ics-security";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -399,13 +405,8 @@ function Index() {
   useEffect(() => {
     if (!user) return;
     const authKey = `gcal_authorized_${user.uid}`;
-    const tokenKey = `gcal_token_${user.uid}`;
-    const expKey = `gcal_token_exp_${user.uid}`;
     const hasAuthorized = localStorage.getItem(authKey) === "true";
-    const cachedToken = sessionStorage.getItem(tokenKey);
-    const cachedExp = sessionStorage.getItem(expKey);
-
-    if (hasAuthorized || (cachedToken && cachedExp && Date.now() < Number(cachedExp))) {
+    if (hasAuthorized || calendarAccessToken(user.uid)) {
       setIsCalendarAuthorized(true);
     }
   }, [user]);
@@ -444,7 +445,7 @@ function Index() {
       setAnalysisWarnings([]);
       setIsCalendarAuthorized(false);
       setSuccessModalData({ open: false, count: 0, courseName: "" });
-      sessionStorage.clear();
+      clearCalendarAccess();
       await logout();
       toast.success("Has cerrado sesión exitosamente");
     } catch (err) {
@@ -500,11 +501,18 @@ function Index() {
     uploadController.current = controller;
 
     try {
-      const data = await uploadSyllabus(selectedFile, controller.signal, (progress) => {
-        if (controller.signal.aborted) return;
-        setAnalysisProgress(progress.percent);
-        setAnalysisMessage(progress.message);
-      });
+      if (!user) throw new Error("Inicia sesión para analizar tu sílabo.");
+      const idToken = await user.getIdToken();
+      const data = await uploadSyllabus(
+        selectedFile,
+        controller.signal,
+        (progress) => {
+          if (controller.signal.aborted) return;
+          setAnalysisProgress(progress.percent);
+          setAnalysisMessage(progress.message);
+        },
+        idToken,
+      );
       controller.signal.throwIfAborted();
       const detectedCourse = deriveCourseName(selectedFile.name, data.curso);
       setCourseName(detectedCourse);
@@ -694,17 +702,14 @@ function Index() {
     setIsSyncingCalendar(true);
     const syncToastId = toast.loading("Conectando con Google Calendar...");
 
-    const cachedTokenKey = user?.uid ? `gcal_token_${user.uid}` : "gcal_token";
-    const cachedExpiryKey = user?.uid ? `gcal_token_exp_${user.uid}` : "gcal_token_exp";
+    const tokenUserId = user?.uid || "";
 
     try {
       let accessToken: string | undefined;
 
       // 1. Verificar si ya otorgó permiso previamente y tenemos token activo en memoria
-      const cachedToken = sessionStorage.getItem(cachedTokenKey);
-      const cachedExpiry = sessionStorage.getItem(cachedExpiryKey);
-
-      if (cachedToken && cachedExpiry && Date.now() < Number(cachedExpiry)) {
+      const cachedToken = calendarAccessToken(tokenUserId);
+      if (cachedToken) {
         accessToken = cachedToken;
       } else {
         // Primera vez o sesión vencida (>1 hora): Solicitar permiso una sola vez
@@ -724,9 +729,8 @@ function Index() {
           throw new Error("No se pudo obtener el token de acceso de Google Calendar.");
         }
 
-        // Guardar token en sessionStorage (válido por 50 minutos)
-        sessionStorage.setItem(cachedTokenKey, accessToken);
-        sessionStorage.setItem(cachedExpiryKey, (Date.now() + 50 * 60 * 1000).toString());
+        // Mantener el permiso solo en memoria durante esta sesión de la página.
+        rememberCalendarAccess(tokenUserId, accessToken);
       }
 
       toast.loading(`Sincronizando ${activeEvents.length} evaluaciones con tu Google Calendar...`, {
@@ -788,14 +792,13 @@ function Index() {
 
         if (!response.ok) {
           if (response.status === 401) {
-            sessionStorage.removeItem(cachedTokenKey);
-            sessionStorage.removeItem(cachedExpiryKey);
+            clearCalendarAccess();
             throw new Error(
               "La sesión de Google Calendar expiró. Vuelve a hacer clic para autorizar.",
             );
           }
           const errBody = await response.json().catch(() => null);
-          console.error("Error al crear evento en Google Calendar:", errBody);
+          console.error("Google Calendar rechazó la creación de una evaluación.");
           throw new Error(
             errBody?.error?.message || `Error al guardar "${eventSummary}" en Google Calendar.`,
           );
@@ -830,7 +833,7 @@ function Index() {
       });
     } catch (err: unknown) {
       toast.dismiss(syncToastId);
-      console.error("Error sincronizando con Google Calendar:", err);
+      console.error("No se pudo completar la sincronización con Google Calendar.");
       const message =
         err instanceof Error ? err.message : "Ocurrió un error al sincronizar con Google Calendar.";
 
@@ -887,13 +890,13 @@ function Index() {
         `DTSTAMP:${toICSDate(new Date())}`,
         `DTSTART:${startStr}`,
         `DTEND:${endStr}`,
-        `SUMMARY:${eventSummary}`,
-        `DESCRIPTION:Evaluación extraída por Syllabot - UNMSM. ${ev.description || ""}`,
+        `SUMMARY:${escapeIcsText(eventSummary)}`,
+        `DESCRIPTION:${escapeIcsText(`Evaluación extraída por Syllabot - UNMSM. ${ev.description || ""}`)}`,
         "STATUS:CONFIRMED",
         "BEGIN:VALARM",
         "TRIGGER:-P1D",
         "ACTION:DISPLAY",
-        `DESCRIPTION:Recordatorio de ${cleanTitle}`,
+        `DESCRIPTION:${escapeIcsText(`Recordatorio de ${cleanTitle}`)}`,
         "END:VALARM",
         "END:VEVENT",
       );
@@ -901,7 +904,7 @@ function Index() {
 
     icsContent.push("END:VCALENDAR");
 
-    const blob = new Blob([icsContent.join("\r\n")], {
+    const blob = new Blob([icsContent.map(foldIcsLine).join("\r\n")], {
       type: "text/calendar;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -1120,7 +1123,7 @@ function Index() {
               <button
                 type="button"
                 onClick={() => {
-                  window.open("https://calendar.google.com", "_blank");
+                  window.open("https://calendar.google.com", "_blank", "noopener,noreferrer");
                   setSuccessModalData((prev) => ({ ...prev, open: false }));
                 }}
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-[0.99] cursor-pointer"
@@ -1364,6 +1367,7 @@ function Index() {
                   </div>
                   <input
                     type="text"
+                    maxLength={200}
                     value={courseName}
                     onChange={(e) => setCourseName(e.target.value)}
                     placeholder="Ej. Procesos Estocásticos"

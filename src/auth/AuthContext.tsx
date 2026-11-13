@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { clearCalendarAccess } from "@/lib/calendar-auth";
 
 const ALLOWED_DOMAIN = "@unmsm.edu.pe";
 
@@ -21,8 +22,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    clearCalendarAccess();
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.email?.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
+      if (
+        firebaseUser &&
+        firebaseUser.emailVerified &&
+        firebaseUser.email?.toLowerCase().endsWith(ALLOWED_DOMAIN)
+      ) {
         setUser(firebaseUser);
       } else {
         if (firebaseUser) signOut(auth);
@@ -35,8 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      sessionStorage.removeItem("googleCalendarToken");
-      sessionStorage.clear();
+      clearCalendarAccess();
     } catch (e) {
       console.error("Error clearing session storage:", e);
     }

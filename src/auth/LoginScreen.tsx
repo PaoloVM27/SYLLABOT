@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { AlertCircle, Loader2, Lock } from "lucide-react";
 
@@ -61,21 +61,16 @@ export function LoginScreen() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
 
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        sessionStorage.setItem("googleCalendarToken", credential.accessToken);
-      }
-
       const email = result.user.email ?? "";
 
-      if (!email.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
+      if (!result.user.emailVerified || !email.toLowerCase().endsWith(ALLOWED_DOMAIN)) {
         await auth.signOut();
         setBadEmail(email);
         setStep("domain-error");
         return;
       }
     } catch (err: unknown) {
-      console.error("Firebase Auth Error:", err);
+      console.warn("No se pudo completar el inicio de sesión.");
       const e = err as { code?: string; message?: string };
       if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
         setError("Error al conectar con Google. Inténtalo de nuevo.");

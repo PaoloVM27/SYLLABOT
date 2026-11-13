@@ -1,0 +1,151 @@
+{
+  "vulnerabilities": {
+    "info": 0,
+    "low": 2,
+    "moderate": 8,
+    "high": 9,
+    "critical": 1
+  },
+  "advisories": [
+    {
+      "package": "@grpc/grpc-js",
+      "severity": "high",
+      "title": "@grpc/grpc-js: In certain configurations, getAuthContext can return unauthorized certificates as though they were authorized",
+      "url": "https://github.com/advisories/GHSA-m9gg-hp2v-232j",
+      "patched": ">=1.13.6"
+    },
+    {
+      "package": "@grpc/grpc-js",
+      "severity": "low",
+      "title": "@grpc/grpc-js: The server transmits some error messages thrown by method handlers to the client in status messages",
+      "url": "https://github.com/advisories/GHSA-f596-whhp-79r4",
+      "patched": ">=1.13.6"
+    },
+    {
+      "package": "source-map-js",
+      "severity": "high",
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      "patched": ">=1.2.2"
+    },
+    {
+      "package": "shell-quote",
+      "severity": "critical",
+      "title": "shell-quote: `quote()` command injection via a line terminator in a token after a `{ comment }` token",
+      "url": "https://github.com/advisories/GHSA-pqg4-j6r4-53mv",
+      "patched": ">=1.11.0"
+    },
+    {
+      "package": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+      "url": "https://github.com/advisories/GHSA-698v-4r3x-3vcv",
+      "patched": ">=8.1.6"
+    },
+    {
+      "package": "launch-editor",
+      "severity": "moderate",
+      "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+      "url": "https://github.com/advisories/GHSA-698v-4r3x-3vcv",
+      "patched": ">=2.14.2"
+    },
+    {
+      "package": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+      "url": "https://github.com/advisories/GHSA-r825-w8mm-5pxw",
+      "patched": ">=8.1.6"
+    },
+    {
+      "package": "launch-editor",
+      "severity": "moderate",
+      "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+      "url": "https://github.com/advisories/GHSA-r825-w8mm-5pxw",
+      "patched": ">=2.14.2"
+    },
+    {
+      "package": "vite",
+      "severity": "high",
+      "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+      "url": "https://github.com/advisories/GHSA-587h-7wmj-h5pm",
+      "patched": ">=8.1.6"
+    },
+    {
+      "package": "launch-editor",
+      "severity": "high",
+      "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+      "url": "https://github.com/advisories/GHSA-587h-7wmj-h5pm",
+      "patched": ">=2.14.2"
+    },
+    {
+      "package": "vite",
+      "severity": "low",
+      "title": "Vite: Cross origin script execution through Vite custom middleware",
+      "url": "https://github.com/advisories/GHSA-9jrq-w75r-8gcw",
+      "patched": ">=8.1.6"
+    },
+    {
+      "package": "vite",
+      "severity": "moderate",
+      "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+      "url": "https://github.com/advisories/GHSA-rq7h-c2jc-7f22",
+      "patched": ">=8.1.6"
+    },
+    {
+      "package": "zod",
+      "severity": "high",
+      "title": "Zod can exhaust memory while validating oversized constrained collections",
+      "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+      "patched": ">=4.6.6"
+    },
+    {
+      "package": "seroval",
+      "severity": "moderate",
+      "title": "Seroval: Code injection through a typed array's own constructor property",
+      "url": "https://github.com/advisories/GHSA-f86p-h4j2-7qgj",
+      "patched": ">=1.6.11"
+    },
+    {
+      "package": "seroval",
+      "severity": "moderate",
+      "title": "Seroval: Script injection through RegExp sources in serialized output",
+      "url": "https://github.com/advisories/GHSA-9wx9-5pv9-3349",
+      "patched": ">=1.6.10"
+    },
+    {
+      "package": "seroval",
+      "severity": "high",
+      "title": "Seroval: fromJSON deserializer trusts node-supplied array length and sequence doneAt (unauthenticated event-loop DoS)",
+      "url": "https://github.com/advisories/GHSA-97r2-qh9m-474h",
+      "patched": ">=1.6.8"
+    },
+    {
+      "package": "seroval",
+      "severity": "high",
+      "title": "Seroval `fromJSON`/`fromCrossJSON` denial of service via unvalidated array node length",
+      "url": "https://github.com/advisories/GHSA-wp97-x4hv-qvhp",
+      "patched": ">=1.6.8"
+    },
+    {
+      "package": "seroval",
+      "severity": "high",
+      "title": "Seroval: Deserialization invokes attacker-chosen callables: AsyncIteratorFactoryInstance calls source.on(listener) without type check",
+      "url": "https://github.com/advisories/GHSA-7rv5-mrxv-xcr9",
+      "patched": ">=1.6.8"
+    },
+    {
+      "package": "re2js",
+      "severity": "high",
+      "title": "RE2JS: Quadratic-time denial of service in re2js lookbehind matching",
+      "url": "https://github.com/advisories/GHSA-gg6h-894w-4m9c",
+      "patched": ">=2.8.7"
+    },
+    {
+      "package": "minimatch",
+      "severity": "moderate",
+      "title": "minimatch has potential denial of service via globparts amplification",
+      "url": "https://github.com/advisories/GHSA-g3hv-75wg-m249",
+      "patched": ">=11.0.1"
+    }
+  ]
+}
