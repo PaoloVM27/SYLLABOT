@@ -65,6 +65,9 @@ Los límites se pueden ajustar con métricas de uso legítimo; no equivalen a un
 - `pip-audit`: alertas en certifi, Pillow y pyasn1 antes; 0 después en los paquetes
   fijados. El entorno completo detectó además pip antiguo, que se actualizó;
   la segunda comprobación del entorno tampoco reportó alertas conocidas.
+- La primera ejecución en Linux detectó además setuptools 79.0.1 preinstalado
+  con alertas conocidas. Se fijó setuptools 84.1.0 y pip 26.3 también en los
+  requisitos, para actualizar las herramientas del entorno de despliegue.
 - Búsqueda por patrones en 252 blobs históricos: sin coincidencias de claves
   privadas, tokens GitHub o credenciales de servidor literales. No es una prueba
   de ausencia absoluta de secretos; los valores de credenciales nunca se imprimen.
