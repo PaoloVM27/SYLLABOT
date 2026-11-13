@@ -62,7 +62,7 @@ Práctica calificada 30%
         self.assertEqual(next(e for e in evs if e["nombre"] == "Examen Parcial")["semana"], 0)
 
     def test_calculated_dates_must_fit_course_end_and_duration(self):
-        text = "Fecha de inicio: 24/08/2026\nHorario: Jueves\nFecha de finalización: 12/12/2026\nCRONOGRAMA\nDecimosexta Examen final\nDecimoséptima Examen sustitutorio"
+        text = "Fecha de inicio: 24/08/2026\nHorario: Jueves\nFecha de finalización: 12/12/2026\nCRONOGRAMA\nDecimosexta Examen final\nDecimoséptima PC3"
         evs = self.parse(text)
         self.assertEqual(evs[0]["fecha"], "2026-12-10")
         self.assertEqual(evs[1]["fecha"], UNKNOWN)
@@ -75,7 +75,7 @@ Práctica calificada 30%
         self.assertEqual(finalize(parsed)[0]["fecha"], "2026-10-12")
 
     def test_explicit_rescheduled_exam_after_course_end_is_preserved(self):
-        evs = self.parse("Fecha de inicio: 24/08/2026\nFecha de finalización: 12/12/2026\nSemana 17 Examen sustitutorio 17/12/2026")
+        evs = self.parse("Fecha de inicio: 24/08/2026\nFecha de finalización: 12/12/2026\nSemana 17 Examen final 17/12/2026")
         self.assertEqual((evs[0]["fecha"], evs[0]["fecha_origen"]), ("2026-12-17", "explicita"))
 
     def test_ai_merge_keeps_rules_week_and_end_date(self):
@@ -103,7 +103,7 @@ Práctica calificada 30%
 
     def test_practice_percentage_is_not_its_number(self):
         ev = self.parse("Práctica calificada 40%")[0]
-        self.assertEqual(ev["nombre"], "Práctica Calificada")
+        self.assertEqual(ev["nombre"], "Práctica Calificada 1")
         self.assertEqual(ev["peso"], 40)
 
     def test_roman_weeks_and_table_columns(self):
@@ -168,6 +168,60 @@ Práctica calificada 30%
         evs = finalize(merge_results(ai, rules))
         self.assertEqual(len(evs), 2)
         self.assertEqual(evs[0]["fecha"], "2026-10-14")
+
+    def test_never_extract_substitute_exams_even_with_explicit_dates(self):
+        for label in ("Examen sustitutorio", "Examen final sustitutorio", "Examen final (sustitutorio)"):
+            with self.subTest(label=label):
+                self.assertEqual(self.parse("Semana 17 " + label + " 17/12/2026"), [])
+        self.assertEqual(finalize({"evaluaciones": [{"nombre": "EXAMEN SUSTITUTORIO", "semana": 17, "fecha": "2026-12-17"}]}), [])
+
+    def test_substitute_exam_does_not_remove_final_from_same_line(self):
+        evs = self.parse("Semana 16 Examen final / Examen sustitutorio")
+        self.assertEqual([e["nombre"] for e in evs], ["Examen Final"])
+
+    def test_generic_and_numbered_practice_mentions_do_not_add_extra_events(self):
+        evs = self.parse("Evaluación\nPC1\nPC2\nCRONOGRAMA\nSemana 10 Práctica calificada")
+        self.assertEqual([e["nombre"] for e in evs], ["Práctica Calificada 1", "Práctica Calificada 2"])
+
+    def test_two_scheduled_generic_practices_merge_with_numbered_summary(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nHorario: Jueves\nEvaluación\nPC1\nPC2\nCRONOGRAMA\nCuarta Práctica calificada 10%\nDuodécima Práctica calificada 20%")
+        self.assertEqual([e["nombre"] for e in evs], ["Práctica Calificada 1", "Práctica Calificada 2"])
+        self.assertEqual([e["fecha"] for e in evs], ["2026-09-17", "2026-11-12"])
+        self.assertEqual([e["peso"] for e in evs], [10, 20])
+
+    def test_numbered_practice_repeated_at_different_locations_is_one_identity(self):
+        evs = self.parse("PC1\nCRONOGRAMA\nSemana 4 PC1\nSemana 8 PC1 10%\nSemana 12 PC2")
+        self.assertEqual(len(evs), 2)
+        self.assertEqual(len([e for e in evs if e["nombre"] == "Práctica Calificada 1"]), 1)
+
+    def test_default_is_at_most_two_unnumbered_practices(self):
+        evs = self.parse("CRONOGRAMA\nSemana 4 Práctica calificada\nSemana 8 Práctica calificada\nSemana 12 Práctica calificada")
+        self.assertEqual([e["nombre"] for e in evs], ["Práctica Calificada 1", "Práctica Calificada 2"])
+
+    def test_generic_practice_repeated_by_week_and_exact_date_is_one_event(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nHorario: Jueves\nSemana 4 Práctica calificada\n5. Evaluación\nPráctica calificada 17/09/2026")
+        self.assertEqual(len(evs), 1)
+        self.assertEqual((evs[0]["nombre"], evs[0]["fecha"]), ("Práctica Calificada 1", "2026-09-17"))
+
+    def test_practice_date_is_not_evidence_of_a_large_practice_number(self):
+        for when in ("29/10/2026", "29 de octubre de 2026"):
+            with self.subTest(when=when):
+                parsed = extract_without_ai("Práctica calificada " + when)
+                self.assertEqual(parsed["limite_practicas"], 2)
+                self.assertEqual(finalize(parsed)[0]["nombre"], "Práctica Calificada 1")
+
+    def test_explicit_count_allows_more_than_two_practices(self):
+        for count in ("Tres prácticas calificadas", "3 prácticas calificadas", "Prácticas calificadas: 3"):
+            with self.subTest(count=count):
+                evs = self.parse(count + "\nCRONOGRAMA\nSemana 4 Práctica calificada\nSemana 8 Práctica calificada\nSemana 12 Práctica calificada")
+                self.assertEqual(len(evs), 3)
+
+    def test_ai_cannot_raise_practice_limit_without_document_evidence(self):
+        rules = extract_without_ai("Semana 4 PC1\nSemana 12 PC2")
+        ai = {"evaluaciones": [{"nombre": "PC1", "semana": 4}, {"nombre": "PC2", "semana": 12},
+                               {"nombre": "PC3", "semana": 14}, {"nombre": "Examen sustitutorio", "semana": 17}]}
+        evs = finalize(merge_results(ai, rules))
+        self.assertEqual([e["nombre"] for e in evs], ["Práctica Calificada 1", "Práctica Calificada 2"])
 
 
 if __name__ == "__main__":

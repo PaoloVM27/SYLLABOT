@@ -33,7 +33,7 @@ WORD_NUMBERS = "|".join(re.escape(word).replace(r"\ ", r"\s+")
                         for word in sorted(WEEK_WORDS, key=len, reverse=True))
 NUMBER = r"(?:" + WORD_NUMBERS + r"|\d{1,2}|[ivx]{1,5})"
 ORDINALS = {"primera": 1, "segunda": 2, "tercera": 3, "cuarta": 4, "quinta": 5, "sexta": 6}
-PRACTICE_NUMBER = r"(?:\s*(?:n[.°ºo]*\s*)?(?:\d{1,2}|[ivx]+)\b(?!\s*%))?"
+PRACTICE_NUMBER = r"(?:\s*(?:n[.°ºo]*\s*)?(?:\d{1,2}|[ivx]+)\b(?!\s*%|[/-]\d|\s+de\b))?"
 DATE_RE = re.compile(
     r"\b(?:(?P<iso>20\d{2}-\d{1,2}-\d{1,2})|"
     r"(?P<d>\d{1,2})[/-](?P<m>\d{1,2})[/-](?P<y>20\d{2})|"
@@ -118,11 +118,106 @@ def canonical(label: str) -> str:
     return label.strip().capitalize()
 
 
+def practice_index(ev: dict) -> int:
+    match = re.search(r"(\d+)$", ev["nombre"])
+    return int(match[1]) if match and kind(ev["nombre"]) == "practice" else 0
+
+
+def practice_limit(text: str, evaluations: list[dict]) -> int:
+    """Only document evidence can raise the default of two, never an AI guess."""
+    counts = {"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+              "siete": 7, "ocho": 8, "nueve": 9, "diez": 10}
+    token = r"(?:\d{1,2}|" + "|".join(counts) + r")"
+    quantities = [2, *(practice_index(ev) for ev in evaluations)]
+    normalized = fold(text)
+    for pattern in (r"\b(" + token + r")\s+(?:\(\d+\)\s*)?practicas\s+calificadas\b",
+                    r"\bpracticas\s+calificadas\s*[:=(]\s*(" + token + r")\b"):
+        for match in re.finditer(pattern, normalized):
+            quantities.append(int(match[1]) if match[1].isdigit() else counts[match[1]])
+    return min(52, max(quantities))
+
+
+def consolidate_practices(evaluations: list[dict], limit: int) -> list[dict]:
+    """Numbered mentions are identities, not extra events beside the schedule."""
+    others = [ev for ev in evaluations if kind(ev["nombre"]) != "practice"]
+    practices = [ev.copy() for ev in evaluations if kind(ev["nombre"]) == "practice"]
+    numbered = {}
+    generic = []
+
+    def quality(ev):
+        return (ev["fecha"] != UNKNOWN, ev.get("fecha_origen") == "explicita",
+                bool(ev["semana"]), bool(ev["peso"]))
+
+    def chronology(ev):
+        return (ev["fecha"] if ev["fecha"] != UNKNOWN else "9999-99-99", ev["semana"] or 999)
+
+    def fill(target, source):
+        if target["fecha"] == UNKNOWN and source["fecha"] != UNKNOWN:
+            target["fecha"] = source["fecha"]
+            target["fecha_origen"] = source.get("fecha_origen", "pendiente")
+        if not target["semana"] and (source["fecha"] == UNKNOWN or target["fecha"] == source["fecha"]):
+            target["semana"] = source["semana"]
+        if not target["peso"]:
+            target["peso"] = source["peso"]
+
+    for ev in practices:
+        index = practice_index(ev)
+        if index:
+            if index > limit:
+                continue
+            existing = numbered.get(index)
+            if existing is None:
+                numbered[index] = ev
+            elif quality(ev) > quality(existing):
+                fill(ev, existing)
+                numbered[index] = ev
+            else:
+                fill(existing, ev)
+        else:
+            existing = next((p for p in generic if
+                             (ev["fecha"] != UNKNOWN and ev["fecha"] == p["fecha"]) or
+                             (ev["semana"] and ev["semana"] == p["semana"])), None)
+            if existing is None:
+                generic.append(ev)
+            elif quality(ev) > quality(existing):
+                fill(ev, existing)
+                generic[generic.index(existing)] = ev
+            else:
+                fill(existing, ev)
+
+    unmatched = []
+    for ev in sorted(generic, key=chronology):
+        matches = [p for p in numbered.values() if
+                   (ev["fecha"] != UNKNOWN and ev["fecha"] == p["fecha"]) or
+                   (ev["semana"] and ev["semana"] == p["semana"])]
+        if len(matches) == 1:
+            fill(matches[0], ev)
+        elif ev["fecha"] != UNKNOWN or ev["semana"] or not numbered:
+            unmatched.append(ev)
+
+    missing = [numbered[i] for i in sorted(numbered) if not numbered[i]["semana"] and numbered[i]["fecha"] == UNKNOWN]
+    if missing:
+        # Two scheduled practices + PC1/PC2 in the grading scheme are the same pair.
+        if len(missing) == len(unmatched):
+            for target, source in zip(missing, unmatched):
+                fill(target, source)
+        # An isolated generic date cannot safely be assigned to one of two unknown PCs.
+        unmatched = []
+    for ev in unmatched:
+        index = next((i for i in range(1, limit + 1) if i not in numbered), None)
+        if index is None:
+            break
+        ev["nombre"] = f"Práctica Calificada {index}"
+        numbered[index] = ev
+    return sorted(others + list(numbered.values()),
+                  key=lambda e: (e["semana"] or 999, e["fecha"], e["nombre"]))
+
+
 def normalize_evaluations(evaluations: list[dict]) -> list[dict]:
     cleaned = []
     for ev in evaluations:
         name = str(ev.get("nombre", "")).strip()
-        if not name:
+        if not name or re.search(r"\bsustitutor(?:io|ia|ios|ias)\b|\bsusti\b", fold(name)):
             continue
         try:
             week = int(ev.get("semana", 0))
@@ -220,6 +315,9 @@ def extract_without_ai(text: str) -> dict:
         events = list(EVENT_RE.finditer(n, event_start))
         for j, match in enumerate(events):
             label = line.strip()[match.start():match.end()]
+            if re.search(r"\bsustitutor(?:io|ia)\b", match[0]) or re.match(
+                    r"\s*(?:\(\s*)?sustitutor(?:io|ia)\b", n[match.end():]):
+                continue
             # Bare projects in lecture topics are not necessarily submissions.
             if match[0] == "proyecto final" and not re.search(r"entrega|presentacion|sustentacion|evaluacion|%", n):
                 continue
@@ -234,12 +332,14 @@ def extract_without_ai(text: str) -> dict:
                                 "fecha": event_date})
     return {"nombre_curso": course, "fecha_inicio": start, "fecha_fin": end,
             "duracion_semanas": duration, "dia_clases": day,
+            "limite_practicas": practice_limit(text, evaluations),
             "evaluaciones": normalize_evaluations(evaluations)}
 
 
 def merge_results(ai: dict, fallback: dict) -> dict:
     """Keep deterministic dated entries if the AI missed them; no blind date merging."""
     merged = dict(ai)
+    merged["limite_practicas"] = fallback.get("limite_practicas", 2)
     for field in ("nombre_curso", "fecha_inicio", "fecha_fin", "duracion_semanas", "dia_clases"):
         if not merged.get(field) or merged[field] == UNKNOWN:
             merged[field] = fallback.get(field, 0 if field == "duracion_semanas" else "")
@@ -287,4 +387,4 @@ def finalize(parsed: dict) -> list[dict]:
                 continue
             ev["fecha"] = candidate.isoformat()
             ev["fecha_origen"] = "calculada"
-    return result
+    return consolidate_practices(result, int(parsed.get("limite_practicas", 2)))

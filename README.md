@@ -39,8 +39,13 @@ Octava, Décima sexta, etc.), EP, EF, PC1/PC2/etc.,
 prácticas calificadas, avances, entregables y presentaciones de proyecto.
 Conserva porcentajes decimales y fechas completas numéricas o con meses en español.
 
-No limita las prácticas a dos ni convierte automáticamente los proyectos de las
-semanas 15/16 en entregas finales. Evita duplicar menciones generales del sistema
+Considera hasta dos prácticas calificadas por defecto. Solo permite más cuando
+el documento lo indica explícitamente por cantidad o numeración (PC3, PC4, etc.).
+Unifica menciones genéricas y numeradas de la misma práctica; no genera una
+práctica adicional por su aparición en el cronograma y en la fórmula de notas.
+Excluye siempre los exámenes sustitutorios, incluso con fecha explícita.
+No convierte automáticamente los proyectos de las semanas 15/16 en entregas
+finales. Evita duplicar menciones generales del sistema
 de evaluación cuando encuentra la misma evaluación en el cronograma. Los pesos
 agrupados de prácticas no se asignan a cada práctica individual.
 

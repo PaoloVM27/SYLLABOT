@@ -64,9 +64,13 @@ duracion_semanas (0 si no se indica), dia_clases
 (día principal de clases en español o vacío) y evaluaciones.
 Cada evaluación tiene nombre, semana (0 si no se indica), peso (0 si no se
 indica) y fecha (YYYY-MM-DD solo si está explícita y con año; si no, 0000-00-00).
-Incluye TODOS los exámenes, prácticas calificadas, entregas, avances y
-presentaciones evaluadas. Conserva numeración y nombres; no impongas un máximo
-de prácticas ni asignes semanas típicas. Ignora clases y prácticas dirigidas.
+Incluye exámenes, prácticas calificadas, entregas, avances y presentaciones evaluadas.
+NUNCA incluyas exámenes sustitutorios, aunque tengan fecha o semana explícita.
+Considera como máximo DOS prácticas calificadas salvo que el documento indique
+explícitamente más (por cantidad o numeración PC3, PC4, etc.). No dupliques una
+práctica mencionada en el cronograma y también en el sistema de evaluación:
+son la misma PC1 o PC2. Conserva sus fechas y porcentajes individuales.
+No asignes semanas típicas. Ignora clases y prácticas dirigidas.
 No conviertas porcentajes, numeración de secciones o códigos de curso en semanas.
 Convierte semanas escritas en palabras a números: Primera=1, Octava=8,
 Décima sexta o Decimosexta=16. El inicio del curso ancla la semana 1; el
