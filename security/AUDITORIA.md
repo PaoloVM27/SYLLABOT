@@ -34,6 +34,7 @@ credenciales distintas. No se agregaron claves privadas al frontend.
 | Trabajos simultáneos                                   | 2 en total, 1 por usuario                                                                       |
 | Lectores de PDF simultáneos                            | 1; la admisión anterior acota la espera                                                         |
 | Recepción del cuerpo                                   | 10 MB de PDF + 64 KiB para multipart; hasta 30 s y 10 s sin recibir datos                       |
+| Partes multipart                                       | 1 archivo; 4 campos de hasta 4 KiB cada uno                                                     |
 | Lector PDF                                             | 50 páginas; 200 000 caracteres; 18 s de pared; Linux: 12 s CPU, 256 MB virtual, 64 descriptores |
 | Intentos de IA                                         | 20 por cuenta/24 h y 300 globales/24 h; al agotarse continúa la extracción por reglas           |
 | Consulta individual a Gemini                           | 12 s por defecto, un intento, respuesta acotada                                                 |

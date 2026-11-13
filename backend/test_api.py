@@ -73,6 +73,18 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1]["type"], "result")
         self.assertEqual(len(events[-1]["data"]["evaluaciones"]), 2)
 
+    async def test_multipart_cannot_exhaust_file_handles_or_field_storage(self):
+        with patch.object(main, "run_pdf_worker", AsyncMock()) as worker:
+            response = await self.api.post("/upload", files=[
+                ("file", ("first.pdf", b"%PDF-test", "application/pdf")),
+                ("extra", ("second.pdf", b"%PDF-test", "application/pdf")),
+            ])
+            self.assertEqual(response.status_code, 400)
+            response = await self.api.post("/upload", files={"file": ("silabo.pdf", b"%PDF-test")},
+                                           data={f"field{i}": "value" for i in range(5)})
+            self.assertEqual(response.status_code, 400)
+            worker.assert_not_awaited()
+
     async def test_stream_survives_gemini_failure_with_automatic_fallback(self):
         generate = AsyncMock(side_effect=RuntimeError("provider unavailable"))
         fake = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate)))

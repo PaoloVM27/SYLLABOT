@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.routing import APIRoute
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from google import genai
 from google.genai import types
@@ -94,7 +95,22 @@ async def lifespan(app):
         client.close()
 
 
+class BoundedUploadRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def bounded(request: Request):
+            if request.method == "POST" and request.url.path.rstrip("/") == "/upload":
+                # Authentication and body limits run first in UploadGuard. Bound part
+                # counts too: many tiny files must not exhaust temporary file handles.
+                async with request.form(max_files=1, max_fields=4, max_part_size=4096):
+                    return await handler(request)
+            return await handler(request)
+        return bounded
+
+
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+app.router.route_class = BoundedUploadRoute
 app.add_middleware(UploadGuard, security=security)
 app.add_middleware(
     CORSMiddleware,
