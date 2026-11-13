@@ -91,6 +91,26 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(data["evaluaciones"]), 2)
             self.assertTrue(data["advertencias"])
 
+    async def test_pdf_with_word_weeks_calculates_dates_from_course_schedule(self):
+        text = """Curso: Modelos y Simulacion
+Duracion: 16 semanas
+Fecha de inicio: 24 de agosto de 2026
+Fecha de finalizacion: 12 de diciembre de 2026
+Horario: G1: Jueves 14:00-18:00
+Unidades de aprendizaje
+UNIDAD I
+Duracion: 4 semanas
+Semana Contenido tematico
+Primera Presentacion del silabo
+Octava Examen Parcial
+Decimosexta Examen Final"""
+        response = await self.upload(contents=pdf_bytes(text))
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual([e["fecha"] for e in result["evaluaciones"]], ["2026-10-15", "2026-12-10"])
+        self.assertTrue(all(e["fecha_origen"] == "calculada" for e in result["evaluaciones"]))
+        self.assertFalse(any("sin fecha" in warning for warning in result["advertencias"]))
+
     async def test_invalid_pdf_word_and_scanned_pdf_errors(self):
         for contents, filename, status in ((b"not pdf", "a.pdf", 422), (b"word", "a.docx", 400),
                                            (pdf_bytes(""), "scanned.pdf", 422)):

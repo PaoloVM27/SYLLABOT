@@ -12,7 +12,26 @@ MONTHS["setiembre"] = 9
 ROMANS = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7,
           "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12, "xiii": 13,
           "xiv": 14, "xv": 15, "xvi": 16, "xvii": 17, "xviii": 18, "xix": 19, "xx": 20}
-NUMBER = r"(?:\d{1,2}|[ivx]{1,5})"
+WEEK_WORDS = {}
+for index, stem in enumerate(("primer", "segund", "tercer", "cuart", "quint", "sext",
+                              "septim", "octav", "noven", "decim"), 1):
+    WEEK_WORDS[stem + "a"] = index
+    WEEK_WORDS[stem + "o"] = index
+WEEK_WORDS.update({"primer": 1, "tercer": 3, "undecima": 11, "undecimo": 11,
+                   "duodecima": 12, "duodecimo": 12})
+for tens, stem in ((10, "decim"), (20, "vigesim"), (30, "trigesim")):
+    for gender in ("a", "o"):
+        WEEK_WORDS[stem + gender] = tens
+        if tens == 30:
+            continue
+        for unit, unit_stem in enumerate(("primer", "segund", "tercer", "cuart", "quint",
+                                         "sext", "septim", "octav", "noven"), 1):
+            for unit_gender in ("a", "o"):
+                WEEK_WORDS[stem + gender + " " + unit_stem + unit_gender] = tens + unit
+                WEEK_WORDS[stem + gender + unit_stem + unit_gender] = tens + unit
+WORD_NUMBERS = "|".join(re.escape(word).replace(r"\ ", r"\s+")
+                        for word in sorted(WEEK_WORDS, key=len, reverse=True))
+NUMBER = r"(?:" + WORD_NUMBERS + r"|\d{1,2}|[ivx]{1,5})"
 ORDINALS = {"primera": 1, "segunda": 2, "tercera": 3, "cuarta": 4, "quinta": 5, "sexta": 6}
 PRACTICE_NUMBER = r"(?:\s*(?:n[.°ºo]*\s*)?(?:\d{1,2}|[ivx]+)\b(?!\s*%))?"
 DATE_RE = re.compile(
@@ -37,7 +56,8 @@ def fold(text: str) -> str:
 
 
 def number(value: str) -> int:
-    return int(value) if value.isdigit() else ROMANS.get(value, 0)
+    value = " ".join(fold(value).split())
+    return int(value) if value.isdigit() else WEEK_WORDS.get(value, ROMANS.get(value, 0))
 
 
 def dates(text: str) -> list[str]:
@@ -143,9 +163,14 @@ def extract_without_ai(text: str) -> dict:
     lines = text.splitlines()
     course = ""
     start = UNKNOWN
+    end = UNKNOWN
+    duration = 0
     day = ""
+    reading_general = True
     for i, line in enumerate(lines):
         n = fold(line)
+        if re.search(r"unidades\s+de\s+aprendizaje|cronograma|contenido\s+tematico|^\s*unidad\s+[ivx\d]+\b", n):
+            reading_general = False
         label = re.search(r"\b(?:nombre\s+(?:(?:de|del)\s+)?(?:la\s+)?(?:asignatura|curso)|asignatura|curso)\s*[:：]\s*(.*)", n)
         if not course and label:
             course = line[label.start(1):].strip()
@@ -153,6 +178,11 @@ def extract_without_ai(text: str) -> dict:
                 course = lines[i + 1].strip()
         if re.search(r"\b(?:fecha\s+de\s+inicio|inicio\s+de\s+(?:clases|semestre)|inicia\s+el)\b", n):
             start = single_date(line) if dates(line) else single_date(" ".join(lines[i:i + 2]))
+        if re.search(r"\b(?:fecha\s+de\s+(?:finalizacion|fin|termino)|fin\s+de\s+(?:clases|semestre))\b", n):
+            end = single_date(line) if dates(line) else single_date(" ".join(lines[i:i + 2]))
+        duration_match = re.search(r"\bduracion\s*:?\s*(\d{1,2})\s+semanas?\b", n)
+        if duration_match and reading_general and not duration:
+            duration = int(duration_match[1])
         if re.search(r"\b(?:horario|dia\s+de\s+clases|dias\s+de\s+clase)\b", n):
             match = re.search(r"\b(" + "|".join(DAYS) + r")\b", fold(" ".join(lines[i:i + 2])))
             if match:
@@ -163,14 +193,15 @@ def extract_without_ai(text: str) -> dict:
     in_schedule = False
     for line in lines:
         n = fold(line).strip()
-        if re.search(r"cronograma|contenido\s+tematico|programacion\s+(?:de\s+contenidos|semanal|de\s+actividades)|\bsemana\b.*\b(?:fecha|contenido|sesion|actividad)", n):
+        if re.search(r"cronograma|unidades\s+de\s+aprendizaje|contenido\s+tematico|programacion\s+(?:de\s+contenidos|semanal|de\s+actividades)|\bsemana\b.*\b(?:fecha|contenido|sesion|actividad)", n):
             in_schedule = True
-            week = 0
         elif re.match(r"^(?:(?:[ivx]+[.\s-]+|\d+\.\s*))?(?:sistema\s+de\s+evaluacion|evaluacion|bibliografia|referencias|metodologia)\b", n):
             in_schedule = False
             week = 0
         explicit = re.search(r"\bsemanas?\s*:?\s*(?:n[.°ºo]*\s*)?(" + NUMBER + r")\b", n)
-        row = re.match(r"^\|?\s*(" + NUMBER + r")(?:\s*[|:]\s*|\s+)(?![.%])", n) if in_schedule else None
+        if not explicit:
+            explicit = re.search(r"\b(" + WORD_NUMBERS + r")\s+semana\b", n)
+        row = re.match(r"^\|?\s*(" + NUMBER + r")(?:\s*[|:]\s*|\s+|$)(?![.%])", n) if in_schedule else None
         range_row = re.match(r"^\|?\s*" + NUMBER + r"\s*[-–—]\s*" + NUMBER + r"\b", n) if in_schedule else None
         if range_row:
             week = 0
@@ -185,7 +216,8 @@ def extract_without_ai(text: str) -> dict:
                 week = 0
         if re.search(r"preparacion\s+(?:para|del)|repaso\s+(?:para|del)|revision\s+(?:del|de)|simulacro", n):
             continue
-        events = list(EVENT_RE.finditer(n))
+        event_start = match.end() if row and match is row else 0
+        events = list(EVENT_RE.finditer(n, event_start))
         for j, match in enumerate(events):
             label = line.strip()[match.start():match.end()]
             # Bare projects in lecture topics are not necessarily submissions.
@@ -200,15 +232,20 @@ def extract_without_ai(text: str) -> dict:
             evaluations.append({"nombre": canonical(label), "semana": week,
                                 "peso": float(percent[1].replace(",", ".")) if percent else 0,
                                 "fecha": event_date})
-    return {"nombre_curso": course, "fecha_inicio": start, "dia_clases": day,
+    return {"nombre_curso": course, "fecha_inicio": start, "fecha_fin": end,
+            "duracion_semanas": duration, "dia_clases": day,
             "evaluaciones": normalize_evaluations(evaluations)}
 
 
 def merge_results(ai: dict, fallback: dict) -> dict:
     """Keep deterministic dated entries if the AI missed them; no blind date merging."""
     merged = dict(ai)
-    for field in ("nombre_curso", "fecha_inicio", "dia_clases"):
+    for field in ("nombre_curso", "fecha_inicio", "fecha_fin", "duracion_semanas", "dia_clases"):
         if not merged.get(field) or merged[field] == UNKNOWN:
+            merged[field] = fallback.get(field, 0 if field == "duracion_semanas" else "")
+    # Explicit general-information fields outrank a model's interpretation of unit dates/durations.
+    for field in ("fecha_inicio", "fecha_fin", "duracion_semanas", "dia_clases"):
+        if fallback.get(field) and fallback[field] != UNKNOWN:
             merged[field] = fallback[field]
     evaluations = normalize_evaluations(ai["evaluaciones"])
     for ev in fallback["evaluaciones"]:
@@ -230,15 +267,24 @@ def merge_results(ai: dict, fallback: dict) -> dict:
 
 def finalize(parsed: dict) -> list[dict]:
     start = single_date(str(parsed.get("fecha_inicio", "")))
+    end = single_date(str(parsed.get("fecha_fin", "")))
+    end_date = date.fromisoformat(end) if end != UNKNOWN else None
+    try:
+        duration = int(parsed.get("duracion_semanas", 0))
+    except (ValueError, TypeError):
+        duration = 0
     weekday = DAYS.get(fold(str(parsed.get("dia_clases", ""))).strip())
     first_class = None
-    if start != UNKNOWN and weekday is not None:
+    if start != UNKNOWN:
         start_date = date.fromisoformat(start)
-        first_class = start_date + timedelta(days=(weekday - start_date.weekday()) % 7)
+        first_class = start_date + timedelta(days=(weekday - start_date.weekday()) % 7) if weekday is not None else start_date
     result = normalize_evaluations(parsed.get("evaluaciones", []))
     for ev in result:
         ev["fecha_origen"] = "explicita" if ev["fecha"] != UNKNOWN else "pendiente"
         if ev["fecha"] == UNKNOWN and first_class and ev["semana"]:
-            ev["fecha"] = (first_class + timedelta(weeks=ev["semana"] - 1)).isoformat()
+            candidate = first_class + timedelta(weeks=ev["semana"] - 1)
+            if (end_date and candidate > end_date) or (duration > 0 and ev["semana"] > duration):
+                continue
+            ev["fecha"] = candidate.isoformat()
             ev["fecha_origen"] = "calculada"
     return result

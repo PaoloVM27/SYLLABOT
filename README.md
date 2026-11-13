@@ -34,7 +34,8 @@ se esté ejecutando en el servidor puede continuar hasta terminar.
 ## Extracción sin IA
 
 Reconoce nombres de curso, inicio de clases, días con tildes, semanas explícitas,
-filas de cronogramas con semanas numéricas o romanas, EP, EF, PC1/PC2/etc.,
+filas de cronogramas con semanas numéricas, romanas o en palabras (Primera,
+Octava, Décima sexta, etc.), EP, EF, PC1/PC2/etc.,
 prácticas calificadas, avances, entregables y presentaciones de proyecto.
 Conserva porcentajes decimales y fechas completas numéricas o con meses en español.
 
@@ -43,8 +44,14 @@ semanas 15/16 en entregas finales. Evita duplicar menciones generales del sistem
 de evaluación cuando encuentra la misma evaluación en el cronograma. Los pesos
 agrupados de prácticas no se asignan a cada práctica individual.
 
-Una fecha explícita tiene prioridad. Solo calcula fechas cuando existen fecha
-de inicio, día de clases y semana. La respuesta identifica `fecha_origen` como
+Una fecha explícita tiene prioridad. La fecha de inicio ancla la semana 1; si
+existe horario, se usa la primera clase en ese día a partir del inicio. Sin
+horario, se toma el propio inicio como la primera clase. La fecha de una
+evaluación se calcula sumando `(semana - 1) * 7` días a esa primera clase.
+Se verifica que el cálculo no supere la fecha de finalización ni la duración
+global del curso; la duración de una unidad no reemplaza la del semestre.
+Las evaluaciones sin semana ni fecha permanecen por confirmar.
+La respuesta identifica `fecha_origen` como
 `explicita`, `calculada` o `pendiente`, y la página advierte cuando hay fechas
 calculadas o faltantes. Los rangos de fechas y fechas sin año no se presentan
 como fechas exactas. Las fechas calculadas no contemplan feriados o reprogramaciones.
