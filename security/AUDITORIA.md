@@ -81,6 +81,21 @@ Se agregó CI en Linux/Python 3.11 y Node 22, con acciones oficiales fijadas a S
 permisos de lectura y sin persistir credenciales de Git. Comprueba dependencias,
 historial, pruebas y compilación antes de futuras actualizaciones.
 
+### Resultado del despliegue
+
+Código verificado en producción: `bcca0be085c0fa220e530bfd20b0698cf6fce539`.
+La [validación Linux](https://github.com/PaoloVM27/SYLLABOT/actions/runs/43365928949)
+pasó con 81 pruebas de backend, 20 de frontend, TypeScript, compilación,
+auditorías de dependencias y búsqueda de secretos.
+
+Vercel respondió 200 con CSP, DENY y nosniff. Render confirmó ese commit en
+`/health`. Cinco peticiones de diagnóstico confirmaron: carga anónima 401,
+token falsificado 401, origen ajeno 403, preflight de la web autorizada 200 y
+OpenAPI deshabilitado 404. No se generó tráfico masivo ni llamadas de IA pagadas.
+No se hizo una carga con una sesión institucional real en producción; la
+validación de tokens firmados y PDF completos se cubrió mediante pruebas locales
+y Linux con datos sintéticos.
+
 ## Infraestructura y riesgos residuales
 
 1. **DDoS volumétrico:** no se puede garantizar su prevención desde FastAPI.
