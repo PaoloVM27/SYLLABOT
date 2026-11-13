@@ -91,10 +91,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content: "Convierte tu sí­labo universitario en un calendario (.ics) con IA.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://syllabot-red.vercel.app/SYLLABOT.png" },
-      { property: "og:url", content: "https://syllabot-red.vercel.app" },
+      { property: "og:image", content: "https://syllabot-unmsm.vercel.app/SYLLABOT.png" },
+      { property: "og:url", content: "https://syllabot-unmsm.vercel.app" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "https://syllabot-red.vercel.app/SYLLABOT.png" },
+      { name: "twitter:image", content: "https://syllabot-unmsm.vercel.app/SYLLABOT.png" },
       { name: "theme-color", content: "#fcfbf8" },
     ],
     links: [

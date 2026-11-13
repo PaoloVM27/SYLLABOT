@@ -20,7 +20,7 @@ CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@syste
 MAX_REQUEST_BYTES = 10 * 1024 * 1024 + 64 * 1024
 UPLOAD_IDLE_TIMEOUT_SECONDS = 10
 UPLOAD_TOTAL_TIMEOUT_SECONDS = 30
-ALLOWED_ORIGINS = {"https://syllabot-red.vercel.app", *filter(None, (
+ALLOWED_ORIGINS = {"https://syllabot-unmsm.vercel.app", *filter(None, (
     origin.strip().rstrip("/") for origin in os.getenv("CORS_ORIGINS", "").split(",")))}
 
 
