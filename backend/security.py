@@ -18,6 +18,8 @@ FIREBASE_PROJECT = os.getenv("FIREBASE_PROJECT_ID", "syllabot-unmsm")
 ALLOWED_EMAIL_DOMAIN = "unmsm.edu.pe"
 CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
 MAX_REQUEST_BYTES = 10 * 1024 * 1024 + 64 * 1024
+UPLOAD_IDLE_TIMEOUT_SECONDS = 10
+UPLOAD_TOTAL_TIMEOUT_SECONDS = 30
 ALLOWED_ORIGINS = {"https://syllabot-red.vercel.app", *filter(None, (
     origin.strip().rstrip("/") for origin in os.getenv("CORS_ORIGINS", "").split(",")))}
 
@@ -194,15 +196,21 @@ class UploadGuard:
             user_reserved = True
             scope.setdefault("state", {})["user_id"] = uid
             received = 0
-            deadline = monotonic() + 30
+            body_complete = False
+            deadline = monotonic() + UPLOAD_TOTAL_TIMEOUT_SECONDS
 
             async def limited_receive():
-                nonlocal received
+                nonlocal received, body_complete
+                # StreamingResponse may keep receiving to detect disconnects.
+                # Once upload EOF arrives, silence means processing, not a slow
+                # upload. Preserve disconnect delivery without upload deadlines.
+                if body_complete:
+                    return await receive()
                 try:
                     remaining = deadline - monotonic()
                     if remaining <= 0:
                         raise TimeoutError()
-                    message = await asyncio.wait_for(receive(), min(10, remaining))
+                    message = await asyncio.wait_for(receive(), min(UPLOAD_IDLE_TIMEOUT_SECONDS, remaining))
                 except TimeoutError:
                     from starlette.exceptions import HTTPException
                     raise HTTPException(408, "La carga tardó demasiado. Intenta nuevamente.") from None
@@ -211,6 +219,7 @@ class UploadGuard:
                     if received > MAX_REQUEST_BYTES:
                         from starlette.exceptions import HTTPException
                         raise HTTPException(413, "El PDF supera el límite de 10 MB.")
+                    body_complete = not message.get("more_body", False)
                 return message
 
             await self.app(scope, limited_receive, send)

@@ -98,6 +98,13 @@ y Linux con datos sintéticos.
 
 ## Infraestructura y riesgos residuales
 
+Corrección posterior de disponibilidad: los límites de recepción se aplican
+solo hasta recibir el último fragmento del cuerpo. El listener de desconexión
+del streaming no debe activar el timeout de subida durante el análisis. Se
+reprodujo el fallo antes del parche y se verificó la corrección mediante 83
+pruebas y HTTP real con un análisis de más de 10 segundos. Las cargas incompletas
+siguen sujetas a los límites de tiempo y tamaño.
+
 1. **DDoS volumétrico:** no se puede garantizar su prevención desde FastAPI.
    [Render proporciona protección DDoS de borde](https://render.com/docs/ddos-protection)
    y [Vercel dispone de mitigación DDoS](https://vercel.com/docs/vercel-firewall/ddos-mitigation).

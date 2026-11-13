@@ -150,6 +150,16 @@ class GuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 408)
         self.assertEqual(self.state.active, 0)
 
+    async def test_incomplete_upload_still_has_an_idle_timeout(self):
+        async def body():
+            yield b"first"
+            await asyncio.sleep(1)
+            yield b"second"
+        with patch("security.UPLOAD_IDLE_TIMEOUT_SECONDS", 0.02):
+            response = await self.client.post("/upload", content=body(), headers=self.headers)
+        self.assertEqual(response.status_code, 408)
+        self.assertEqual(self.state.active, 0)
+
     async def test_foreign_origin_cannot_consume_processing(self):
         response = await self.client.post("/upload", content=b"x", headers={**self.headers, "Origin": "https://evil.example"})
         self.assertEqual(response.status_code, 403)

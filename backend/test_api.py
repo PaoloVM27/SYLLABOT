@@ -96,6 +96,24 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any("sin IA" in warning for warning in events[-1]["data"]["advertencias"]))
         generate.assert_awaited_once()
 
+    async def test_completed_upload_keeps_stream_open_past_upload_timeouts(self):
+        async def slow_analysis(text, fallback):
+            await asyncio.sleep(0.08)
+            return fallback, "timeout"
+
+        # Exercise ASGI's disconnect listener while the real PDF worker and AI
+        # processing continue. Upload deadlines must stop once the body is read.
+        with patch("security.UPLOAD_IDLE_TIMEOUT_SECONDS", 0.02), \
+                patch("security.UPLOAD_TOTAL_TIMEOUT_SECONDS", 0.06), \
+                patch.object(main, "enhance_with_ai", slow_analysis):
+            response = await self.upload(headers={"Accept": "application/x-ndjson"})
+        self.assertEqual(response.status_code, 200)
+        events = [json.loads(line) for line in response.text.splitlines()]
+        self.assertEqual(events[-1]["type"], "result")
+        self.assertEqual(len(events[-1]["data"]["evaluaciones"]), 2)
+        self.assertEqual(main.security.active, 0)
+        self.assertFalse(main.security.active_users)
+
     async def test_stream_reports_pdf_error_without_result_or_completion(self):
         response = await self.upload(contents=pdf_bytes(""), headers={"Accept": "application/x-ndjson"})
         events = [json.loads(line) for line in response.text.splitlines()]
