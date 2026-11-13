@@ -19,6 +19,11 @@ for index, stem in enumerate(("primer", "segund", "tercer", "cuart", "quint", "s
     WEEK_WORDS[stem + "o"] = index
 WEEK_WORDS.update({"primer": 1, "tercer": 3, "undecima": 11, "undecimo": 11,
                    "duodecima": 12, "duodecimo": 12})
+# These forms are common in syllabus week columns even though they are fractional names.
+for index, stem in enumerate(("once", "doce", "trece", "catorce", "quince", "dieciseis",
+                              "diecisiete", "dieciocho", "diecinueve", "veinte"), 11):
+    WEEK_WORDS[stem + "ava"] = index
+    WEEK_WORDS[stem + "avo"] = index
 for tens, stem in ((10, "decim"), (20, "vigesim"), (30, "trigesim")):
     for gender in ("a", "o"):
         WEEK_WORDS[stem + gender] = tens
@@ -137,6 +142,26 @@ def practice_limit(text: str, evaluations: list[dict]) -> int:
     return min(52, max(quantities))
 
 
+def consolidate_exams(evaluations: list[dict]) -> list[dict]:
+    """A course has one partial and one final; repeated mentions are not new exams."""
+    result = [e for e in evaluations if kind(e["nombre"]) not in ("partial", "final")]
+    for category in ("partial", "final"):
+        candidates = [e for e in evaluations if kind(e["nombre"]) == category]
+        if not candidates:
+            continue
+        dated = [e for e in candidates if e["fecha"] != UNKNOWN]
+        weekly = [e for e in candidates if e["semana"]]
+        pool = dated or weekly or candidates
+        key = (lambda e: e["fecha"]) if dated else (lambda e: e["semana"])
+        best = (min(pool, key=key) if category == "partial" else max(pool, key=key)).copy()
+        if not best["peso"]:
+            weights = {e["peso"] for e in candidates if e["peso"]}
+            if len(weights) == 1:
+                best["peso"] = weights.pop()
+        result.append(best)
+    return sorted(result, key=lambda e: (e["semana"] or 999, e["fecha"], e["nombre"]))
+
+
 def consolidate_practices(evaluations: list[dict], limit: int) -> list[dict]:
     """Numbered mentions are identities, not extra events beside the schedule."""
     others = [ev for ev in evaluations if kind(ev["nombre"]) != "practice"]
@@ -224,9 +249,12 @@ def normalize_evaluations(evaluations: list[dict]) -> list[dict]:
             weight = float(ev.get("peso", 0))
         except (TypeError, ValueError):
             continue
-        cleaned.append({"nombre": canonical(name), "semana": week if 1 <= week <= 52 else 0,
-                        "peso": weight if 0 <= weight <= 100 else 0,
-                        "fecha": single_date(str(ev.get("fecha", "")))})
+        item = {"nombre": canonical(name), "semana": week if 1 <= week <= 52 else 0,
+                "peso": weight if 0 <= weight <= 100 else 0,
+                "fecha": single_date(str(ev.get("fecha", "")))}
+        if ev.get("fecha_origen") in ("explicita", "calculada", "pendiente"):
+            item["fecha_origen"] = ev["fecha_origen"]
+        cleaned.append(item)
     # General mentions of the grading scheme should not duplicate scheduled exams.
     scheduled = [e for e in cleaned if e["semana"] or e["fecha"] != UNKNOWN]
     result = []
@@ -290,7 +318,8 @@ def extract_without_ai(text: str) -> dict:
         n = fold(line).strip()
         if re.search(r"cronograma|unidades\s+de\s+aprendizaje|contenido\s+tematico|programacion\s+(?:de\s+contenidos|semanal|de\s+actividades)|\bsemana\b.*\b(?:fecha|contenido|sesion|actividad)", n):
             in_schedule = True
-        elif re.match(r"^(?:(?:[ivx]+[.\s-]+|\d+\.\s*))?(?:sistema\s+de\s+evaluacion|evaluacion|bibliografia|referencias|metodologia)\b", n):
+        elif (re.match(r"^(?:(?:[ivx]+[.\s-]+|\d+\.\s*))?(?:sistema\s+de\s+evaluacion|evaluacion|bibliografia|referencias|metodologia)\b", n)
+              or re.match(r"^(?:\d{1,2}\.|[ivx]+\.)\s+[a-z]", n)):
             in_schedule = False
             week = 0
         explicit = re.search(r"\bsemanas?\s*:?\s*(?:n[.°ºo]*\s*)?(" + NUMBER + r")\b", n)
@@ -330,10 +359,13 @@ def extract_without_ai(text: str) -> dict:
             evaluations.append({"nombre": canonical(label), "semana": week,
                                 "peso": float(percent[1].replace(",", ".")) if percent else 0,
                                 "fecha": event_date})
-    return {"nombre_curso": course, "fecha_inicio": start, "fecha_fin": end,
-            "duracion_semanas": duration, "dia_clases": day,
-            "limite_practicas": practice_limit(text, evaluations),
-            "evaluaciones": normalize_evaluations(evaluations)}
+    limit = practice_limit(text, evaluations)
+    parsed = {"nombre_curso": course, "fecha_inicio": start, "fecha_fin": end,
+              "duracion_semanas": duration, "dia_clases": day,
+              "limite_practicas": limit, "evaluaciones": normalize_evaluations(evaluations)}
+    # Establish identities/dates from the source schedule before any model output.
+    parsed["evaluaciones"] = finalize(parsed)
+    return parsed
 
 
 def merge_results(ai: dict, fallback: dict) -> dict:
@@ -349,16 +381,20 @@ def merge_results(ai: dict, fallback: dict) -> dict:
             merged[field] = fallback[field]
     evaluations = normalize_evaluations(ai["evaluaciones"])
     for ev in fallback["evaluaciones"]:
+        identity = kind(ev["nombre"]) in ("partial", "final") or practice_index(ev) > 0
         matches = [e for e in evaluations if (e["nombre"] == ev["nombre"] or
                    kind(e["nombre"]) == kind(ev["nombre"]) and kind(ev["nombre"]) in ("partial", "final"))
-                   and (e["semana"] == ev["semana"] or not e["semana"])]
-        if len(matches) == 1:
-            if ev["fecha"] != UNKNOWN:
-                matches[0]["fecha"] = ev["fecha"]
-            if ev["semana"]:
-                matches[0]["semana"] = ev["semana"]
-            if not matches[0]["peso"]:
-                matches[0]["peso"] = ev["peso"]
+                   and (identity or e["semana"] == ev["semana"] or not e["semana"])]
+        if len(matches) == 1 or identity and matches:
+            for match in matches:
+                if ev["fecha"] != UNKNOWN or ev["semana"]:
+                    # A documented week overrides an unsupported model date or week.
+                    match["fecha"] = ev["fecha"]
+                    match["fecha_origen"] = ev.get("fecha_origen", "explicita" if ev["fecha"] != UNKNOWN else "pendiente")
+                if ev["semana"]:
+                    match["semana"] = ev["semana"]
+                if ev["peso"] or not match["peso"]:
+                    match["peso"] = ev["peso"]
         elif not matches and (ev["semana"] or ev["fecha"] != UNKNOWN):
             evaluations.append(ev.copy())
     merged["evaluaciones"] = normalize_evaluations(evaluations)
@@ -380,11 +416,42 @@ def finalize(parsed: dict) -> list[dict]:
         first_class = start_date + timedelta(days=(weekday - start_date.weekday()) % 7) if weekday is not None else start_date
     result = normalize_evaluations(parsed.get("evaluaciones", []))
     for ev in result:
-        ev["fecha_origen"] = "explicita" if ev["fecha"] != UNKNOWN else "pendiente"
+        ev["fecha_origen"] = ev.get("fecha_origen", "explicita") if ev["fecha"] != UNKNOWN else "pendiente"
         if ev["fecha"] == UNKNOWN and first_class and ev["semana"]:
             candidate = first_class + timedelta(weeks=ev["semana"] - 1)
             if (end_date and candidate > end_date) or (duration > 0 and ev["semana"] > duration):
                 continue
             ev["fecha"] = candidate.isoformat()
             ev["fecha_origen"] = "calculada"
-    return consolidate_practices(result, int(parsed.get("limite_practicas", 2)))
+    result = consolidate_exams(result)
+    result = consolidate_practices(result, int(parsed.get("limite_practicas", 2)))
+    return validate_sequence(result)
+
+
+def validate_sequence(evaluations: list[dict]) -> list[dict]:
+    """Reject contradictory dates rather than move an exam to an invented week."""
+    partial = next((e for e in evaluations if kind(e["nombre"]) == "partial"), None)
+    final = next((e for e in evaluations if kind(e["nombre"]) == "final"), None)
+    pc2 = next((e for e in evaluations if practice_index(e) == 2), None)
+
+    def compare(left, right):
+        if left is None or right is None:
+            return None
+        if left["fecha"] != UNKNOWN and right["fecha"] != UNKNOWN:
+            return left["fecha"] >= right["fecha"]
+        if left["semana"] and right["semana"]:
+            return left["semana"] >= right["semana"]
+        return None
+
+    def pending(ev):
+        ev.update(fecha=UNKNOWN, fecha_origen="pendiente", semana=0)
+
+    if compare(partial, final):
+        pending(final)
+    if compare(partial, pc2):
+        pending(pc2)
+    if compare(pc2, final):
+        pending(final)
+    return sorted(evaluations, key=lambda e: (
+        e["fecha"] if e["fecha"] != UNKNOWN else "9999-99-99",
+        e["semana"] or 999, e["nombre"]))

@@ -7,6 +7,90 @@ class ExtractionTests(unittest.TestCase):
     def parse(self, text):
         return finalize(extract_without_ai(text))
 
+    def models_schedule(self):
+        return """Curso: Modelos y Simulación
+Fecha de inicio: 24 de agosto de 2026
+Fecha de finalización: 12 de diciembre de 2026
+Duración: 16 semanas
+Horario: G1: Jueves 14:00-18:00
+Evaluación
+PC1
+PC2
+Unidades de aprendizaje
+Semana Contenido temático Estrategia metodológica Evidencias
+Cuarta Práctica calificada
+Octava Examen parcial
+Décima Modelos de simulación
+Onceava Análisis de resultados
+Experimentación y toma de decisiones
+Doceava Enfoque de simulación orientada a procesos
+Estudios de casos
+Práctica calificada
+Treceava Temas del curso
+Catorceava Temas del curso
+Quinceava Temas del curso
+Dieciseisava Examen final
+5. Calificación
+Examen parcial 30%
+Examen final 40%
+"""
+
+    def test_fractional_week_names_do_not_inherit_week_ten(self):
+        evs = self.parse(self.models_schedule())
+        self.assertEqual([e["nombre"] for e in evs], ["Práctica Calificada 1", "Examen Parcial", "Práctica Calificada 2", "Examen Final"])
+        self.assertEqual([e["semana"] for e in evs], [4, 8, 12, 16])
+        self.assertEqual([e["fecha"] for e in evs], ["2026-09-17", "2026-10-15", "2026-11-12", "2026-12-10"])
+
+    def test_source_schedule_overrides_duplicate_exams_and_wrong_ai_dates(self):
+        source = extract_without_ai(self.models_schedule())
+        ai = {"evaluaciones": [
+            {"nombre": "PC1", "semana": 4},
+            {"nombre": "Examen parcial", "semana": 8},
+            {"nombre": "Examen parcial", "semana": 10, "fecha": "2026-10-29"},
+            {"nombre": "Examen final", "semana": 10, "fecha": "2026-10-29"},
+            {"nombre": "PC2", "semana": 10, "fecha": "2026-10-29"}]}
+        evs = finalize(merge_results(ai, source))
+        self.assertEqual(len(evs), 4)
+        self.assertEqual([e["semana"] for e in evs], [4, 8, 12, 16])
+        self.assertEqual([e["fecha"] for e in evs], ["2026-09-17", "2026-10-15", "2026-11-12", "2026-12-10"])
+        self.assertTrue(all(e["fecha_origen"] == "calculada" for e in evs))
+
+    def test_only_one_partial_and_final_choose_first_and_last_exam(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nHorario: Jueves\nSemana 8 Examen parcial\nSemana 10 Examen parcial\nSemana 10 Examen final\nSemana 12 PC2\nSemana 16 Examen final")
+        self.assertEqual([e["nombre"] for e in evs], ["Examen Parcial", "Práctica Calificada 2", "Examen Final"])
+        self.assertEqual([e["semana"] for e in evs], [8, 12, 16])
+
+    def test_summary_section_does_not_inherit_last_schedule_week(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nCRONOGRAMA\nDécima Temas del curso\n5. Calificación\nExamen final")
+        self.assertEqual(evs[0]["semana"], 0)
+        self.assertEqual(evs[0]["fecha"], UNKNOWN)
+
+    def test_pc2_before_partial_is_pending_instead_of_a_false_date(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nSemana 6 PC2\nSemana 8 Examen parcial\nSemana 16 Examen final")
+        pc2 = next(e for e in evs if e["nombre"] == "Práctica Calificada 2")
+        self.assertEqual((pc2["fecha"], pc2["semana"]), (UNKNOWN, 0))
+
+    def test_early_final_does_not_displace_documented_pc2_week(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nHorario: Jueves\nSemana 8 Examen parcial\nSemana 10 Examen final\nDoceava PC2")
+        pc2 = next(e for e in evs if e["nombre"] == "Práctica Calificada 2")
+        final = next(e for e in evs if e["nombre"] == "Examen Final")
+        self.assertEqual(pc2["fecha"], "2026-11-12")
+        self.assertEqual(final["fecha"], UNKNOWN)
+
+    def test_partial_and_final_cannot_share_a_date(self):
+        evs = self.parse("Semana 8 Examen parcial 15/10/2026\nSemana 8 Examen final 15/10/2026")
+        self.assertEqual(next(e for e in evs if e["nombre"] == "Examen Final")["fecha"], UNKNOWN)
+
+    def test_explicit_dates_sort_chronologically_even_without_week_numbers(self):
+        evs = self.parse("Fecha de inicio: 24/08/2026\nHorario: Jueves\nExamen parcial 15/10/2026\nSemana 12 PC2\nSemana 16 Examen final")
+        self.assertEqual([e["nombre"] for e in evs], ["Examen Parcial", "Práctica Calificada 2", "Examen Final"])
+
+    def test_repeated_finalization_keeps_calculated_date_provenance(self):
+        parsed = extract_without_ai(self.models_schedule())
+        evs = finalize(parsed)
+        self.assertEqual(parsed["evaluaciones"], evs)
+        self.assertTrue(all(e["fecha_origen"] == "calculada" for e in evs))
+
     def test_word_weeks_and_general_information_like_models_syllabus(self):
         text = """1. Información General
 1.1 Nombre de la Asignatura: Modelos y Simulación

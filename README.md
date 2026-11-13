@@ -35,7 +35,7 @@ se esté ejecutando en el servidor puede continuar hasta terminar.
 
 Reconoce nombres de curso, inicio de clases, días con tildes, semanas explícitas,
 filas de cronogramas con semanas numéricas, romanas o en palabras (Primera,
-Octava, Décima sexta, etc.), EP, EF, PC1/PC2/etc.,
+Octava, Décima sexta y variantes como Onceava/Doceava), EP, EF, PC1/PC2/etc.,
 prácticas calificadas, avances, entregables y presentaciones de proyecto.
 Conserva porcentajes decimales y fechas completas numéricas o con meses en español.
 
@@ -44,6 +44,11 @@ el documento lo indica explícitamente por cantidad o numeración (PC3, PC4, etc
 Unifica menciones genéricas y numeradas de la misma práctica; no genera una
 práctica adicional por su aparición en el cronograma y en la fórmula de notas.
 Excluye siempre los exámenes sustitutorios, incluso con fecha explícita.
+Conserva como máximo un Examen Parcial y un Examen Final: unifica menciones
+repetidas y prioriza las semanas identificadas en el cronograma sobre fechas
+contradictorias propuestas por la IA. Valida el orden parcial → PC2 → final.
+Si una contradicción no puede resolverse con el documento, deja la fecha por
+confirmar en lugar de inventar una semana para hacerla encajar.
 No convierte automáticamente los proyectos de las semanas 15/16 en entregas
 finales. Evita duplicar menciones generales del sistema
 de evaluación cuando encuentra la misma evaluación en el cronograma. Los pesos

@@ -111,6 +111,40 @@ Decimosexta Examen Final"""
         self.assertTrue(all(e["fecha_origen"] == "calculada" for e in result["evaluaciones"]))
         self.assertFalse(any("sin fecha" in warning for warning in result["advertencias"]))
 
+    async def test_schedule_corrects_duplicate_exams_and_wrong_pc2_from_ai(self):
+        text = """Curso: Modelos y Simulacion
+Duracion: 16 semanas
+Fecha de inicio: 24 de agosto de 2026
+Fecha de finalizacion: 12 de diciembre de 2026
+Horario: Jueves
+Evaluacion
+PC1
+PC2
+Unidades de aprendizaje
+Semana Contenido tematico
+Cuarta Practica calificada
+Octava Examen parcial
+Decima Temas del curso
+Onceava Analisis de resultados
+Doceava Estudios de casos
+Practica calificada
+Dieciseisava Examen final
+5. Calificacion
+Examen parcial 30%
+Examen final 40%"""
+        bad_result = {"evaluaciones": [
+            {"nombre": "PC1", "semana": 4}, {"nombre": "Examen parcial", "semana": 8},
+            {"nombre": "Examen parcial", "semana": 10}, {"nombre": "Examen final", "semana": 10},
+            {"nombre": "PC2", "semana": 10, "fecha": "2026-10-29"}]}
+        fake = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(
+            generate_content=AsyncMock(return_value=SimpleNamespace(text=json.dumps(bad_result))))))
+        with patch.object(main, "client", fake):
+            response = await self.upload(contents=pdf_bytes(text))
+        evs = response.json()["evaluaciones"]
+        self.assertEqual(len(evs), 4)
+        self.assertEqual([e["nombre"] for e in evs], ["Práctica Calificada 1", "Examen Parcial", "Práctica Calificada 2", "Examen Final"])
+        self.assertEqual([e["fecha"] for e in evs], ["2026-09-17", "2026-10-15", "2026-11-12", "2026-12-10"])
+
     async def test_invalid_pdf_word_and_scanned_pdf_errors(self):
         for contents, filename, status in ((b"not pdf", "a.pdf", 422), (b"word", "a.docx", 400),
                                            (pdf_bytes(""), "scanned.pdf", 422)):

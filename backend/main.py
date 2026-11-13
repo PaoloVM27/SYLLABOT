@@ -66,6 +66,10 @@ Cada evaluación tiene nombre, semana (0 si no se indica), peso (0 si no se
 indica) y fecha (YYYY-MM-DD solo si está explícita y con año; si no, 0000-00-00).
 Incluye exámenes, prácticas calificadas, entregas, avances y presentaciones evaluadas.
 NUNCA incluyas exámenes sustitutorios, aunque tengan fecha o semana explícita.
+Solo existe UN Examen Parcial y UN Examen Final por curso. Unifica menciones
+repetidas: el parcial ocurre antes que el final, y el final es el último examen.
+La Práctica Calificada 2 ocurre después del parcial y antes del final. Respeta
+su semana documentada; no copies la semana de una fila anterior.
 Considera como máximo DOS prácticas calificadas salvo que el documento indique
 explícitamente más (por cantidad o numeración PC3, PC4, etc.). No dupliques una
 práctica mencionada en el cronograma y también en el sistema de evaluación:
@@ -73,8 +77,9 @@ son la misma PC1 o PC2. Conserva sus fechas y porcentajes individuales.
 No asignes semanas típicas. Ignora clases y prácticas dirigidas.
 No conviertas porcentajes, numeración de secciones o códigos de curso en semanas.
 Convierte semanas escritas en palabras a números: Primera=1, Octava=8,
-Décima sexta o Decimosexta=16. El inicio del curso ancla la semana 1; el
-horario de clases determina el día de las evaluaciones cuando falta su fecha.
+Décima sexta o Decimosexta=16. También Onceava=11, Doceava=12 y Dieciseisava=16.
+El inicio del curso ancla la semana 1; el horario de clases determina el día
+de las evaluaciones cuando falta su fecha.
 La duración y las fechas globales se toman de Información General del curso,
 no de la duración particular de una unidad de aprendizaje.
 Prioriza el cronograma frente a menciones generales del sistema de evaluación.
